@@ -2,17 +2,31 @@
 # add docstrings
 # move all needed paths that need to be set manually to the top
 
-import sys
-import numpy as np
-import vtk
-import os
+
+#TODO: PATHS MUST BE SET MANUALLY BEFORE THE CODE CAN RUN  
 from pathlib import Path
+import os
+import sys
+
 home = Path.home()
 
-#PATH TO Tims VTK Suite:
-# C:\Users\voglt\OneDrive\Desktop\researchProject\code\vtk-suite
-sys.path.append(os.path.join(home, "Onedrive", "Desktop", "researchProject", "code", "vtk-suite"))
+# path to VTK suite:
+VTK_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code", "vtk-suite")
+sys.path.append(VTK_path)
 
+# path for saving output/test_all_unsigned_dist.vtu
+Write_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code", "output", "test_all_unsigned_dist.vtu")
+
+# path for input file 
+Base_path = os.path.join(home, "OneDrive", "Desktop", "researchProject", "code", "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1")
+
+# path to grid 
+Grid_path = os.path.join(home,"OneDrive", "Desktop", "researchProject", "code", "grid_Harish_1000_1000.vtu")
+
+
+
+import numpy as np
+import vtk
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -25,9 +39,9 @@ from vtk_append_data import append_np_array
 from collections import defaultdict
 from copy import deepcopy
 
-# for documenting the performance difference 
+# for documenting the time performance difference 
 import time
-def timeIt(func):
+def time_it(func):
     def wrapper(*args, **kwargs):
         start_time = time.time()
         result = func(*args, **kwargs)
@@ -43,7 +57,7 @@ TESTNumberOfCells = 5
 
 
 
-@timeIt 
+@time_it 
 def calculateInnerContour(filename,value=0.2):
     """
     Calculates and extracts the inner contour of a 2D scalar field from a VTK unstructured grid file.
@@ -110,7 +124,7 @@ def calculateInnerContour(filename,value=0.2):
 
 
 #!!!FRAME TIME IS HARDCODED
-@timeIt 
+@time_it 
 def all_my_midpoints(base_file,N_Cell):
     """
     Computes and stores the midpoints of cells at a specific time frame in a global variable.
@@ -159,7 +173,7 @@ def all_my_midpoints(base_file,N_Cell):
         all_midpoints[i,1]=x1
     return
 
-@timeIt 
+@time_it 
 def interpolate_phi_on_fine_grid(filename,filename_grid):
     grid_fine=read_vtu(filename_grid)
     phi=read_vtu(filename)
@@ -176,7 +190,7 @@ def interpolate_phi_on_fine_grid(filename,filename_grid):
     write_vtu(h,r"C:\Users\voglt\OneDrive\Desktop\researchProject\test.vtu")
     return
     
-@timeIt
+@time_it
 def resample_phi_on_fine_grid(filename,filename_grid):
     grid_fine=read_vtu(filename_grid)
     phi=read_vtu(filename)
@@ -189,13 +203,13 @@ def resample_phi_on_fine_grid(filename,filename_grid):
     #write_vtu(h,"/Users/Lea.Happel/Documents/Software_IWR/pAticsProject/team-project-p-atics/fine_meshes/test_interpolation.vtu")
     return VN.vtk_to_numpy(h.GetPointData().GetArray("phi"))
     
-@timeIt
+@time_it
 def read_fine_grid(file_grid):
     coords_grid,dummy_argument=extract_data(read_vtu(file_grid))
     print("coords_grid ",coords_grid.shape)
     return coords_grid
 
-@timeIt
+@time_it
 def recalculate_indices(N,coords_grid):
     global indices_phi,ind_phi_x,ind_phi_y,dx
     indices_phi=np.zeros((N+1,N+1),dtype=int)
@@ -211,7 +225,7 @@ def recalculate_indices(N,coords_grid):
         ind_phi_y[i]=y_coord
     print("i'm leaving")
     
-@timeIt
+@time_it
 def calculate_unsigned_dist(N,phi,value):
     phi_new=np.zeros((N+1,N+1))
     phi_new=phi[indices_phi]
@@ -221,7 +235,7 @@ def calculate_unsigned_dist(N,phi,value):
     unsigned_dist_resorted=unsigned_dist[ind_phi_x,ind_phi_y]
     return unsigned_dist_resorted
     
-@timeIt
+@time_it
 def all_my_distances(base_file,N,N_Cell,file_grid,value=0.2):
     coords_grid=read_fine_grid(file_grid)
     fine_grid_new=read_vtu(file_grid)
@@ -236,12 +250,11 @@ def all_my_distances(base_file,N,N_Cell,file_grid,value=0.2):
         ud_i=calculate_unsigned_dist(N,phi_grid,value)
         fine_grid_new=append_np_array(fine_grid_new,ud_i,"ud_"+str(i))
 
-    writePath = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code", "output", "test_all_unsigned_dist.vtu")
-    write_vtu(fine_grid_new, writePath)
+    write_vtu(fine_grid_new, Write_path)
     all_my_vertices(fine_grid_new,N_Cell)
     return fine_grid_new
 
-@timeIt
+@time_it
 def adjust_point(ref,test_h):
     test=deepcopy(test_h)
     if (abs(test[0]-ref[0])>50.0):
@@ -256,7 +269,7 @@ def adjust_point(ref,test_h):
             test[1] -=100.0
     return test
 
-@timeIt
+@time_it
 def all_my_vertices(fine_grid,N_Cells,r=20.0):
     all_vertices_collected=defaultdict(list)
     #Later on:Double loop
@@ -379,20 +392,19 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
 
 # template for timetracking: println(f"Function1 time: {timeit.timeit(my_function, number=1):.4f} seconds")
 
-base_file=os.path.join(home,"OneDrive", "Desktop", "researchProject", "code", "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1")
 # filename1='/Users/Lea.Happel/Downloads/o20230614_set3_In3Ca3aa0ar0D0v5Al0Ga3Init1/phasedata/phase_p45_20.000.vtu'
+
 N_Cell=100
 eps=0.1
 filename = f"vertices_not_cleaned_eps_{eps}"
-dir_vertices=os.path.join(base_file, filename)
+dir_vertices=os.path.join(Base_path, filename)
 if not os.path.exists(dir_vertices):
     os.mkdir(dir_vertices)
-file_grid=os.path.join(home,"OneDrive", "Desktop", "researchProject", "code", "grid_Harish_1000_1000.vtu")
 
 N=1000
-all_my_midpoints(base_file,N_Cell)
+all_my_midpoints(Base_path,N_Cell)
 print(all_midpoints)
-all_my_distances(base_file,N,N_Cell,file_grid,eps)
+all_my_distances(Base_path,N,N_Cell,Grid_path,eps)
 
 # c,d_a=calculateInnerContour(filename1)
 # print("c",c)
