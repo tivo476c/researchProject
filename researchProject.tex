@@ -81,11 +81,24 @@ The workflow is customized for a specific research project and contains hardcode
 \begin{enumerate}
     \item \textbf{Input Data}: 
     The script processes:
-    \
+\end{enumerate}
 
 
 
 \section{Improvements}
+\subsection{old times}
+$
+all_my_midpoints executed in 0.4201 seconds \\
+read_fine_grid executed in 11.3103 seconds \\
+recalculate_indices executed in 3.0082 seconds \\
+resample_phi_on_fine_grid executed in 7.3366 seconds \\
+calculate_unsigned_dist executed in 0.6039 seconds \\
+resample_phi_on_fine_grid executed in 7.2603 seconds \\
+all_my_distances needs time: NoCells * (resemple_phi + calculate_unsigned_dist) + all_my_vertices \\
+all_my_vertices executed in 2.2891 seconds (WITH NoCells set to 5)
+all_my_distances executed in 66.8230 seconds (WITH NoCells set to 5) 
+adjust_point executed in 0.0000 seconds \\
+$
 
 \section{Results}
 

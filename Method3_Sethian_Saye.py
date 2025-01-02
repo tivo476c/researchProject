@@ -1,3 +1,7 @@
+# TODO 
+# add docstrings
+# move all needed paths that need to be set manually to the top
+
 import sys
 import numpy as np
 import vtk
@@ -21,6 +25,25 @@ from vtk_append_data import append_np_array
 from collections import defaultdict
 from copy import deepcopy
 
+# for documenting the performance difference 
+import time
+def timeIt(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        print(f"{func.__name__} executed in {end_time - start_time:.4f} seconds")
+        return result
+    return wrapper
+
+
+################################################## Testing parameters 
+# TODO: replace all TESTNumberOfCells with N_Cells
+TESTNumberOfCells = 5 
+
+
+
+@timeIt 
 def calculateInnerContour(filename,value=0.2):
     """
     Calculates and extracts the inner contour of a 2D scalar field from a VTK unstructured grid file.
@@ -87,6 +110,7 @@ def calculateInnerContour(filename,value=0.2):
 
 
 #!!!FRAME TIME IS HARDCODED
+@timeIt 
 def all_my_midpoints(base_file,N_Cell):
     """
     Computes and stores the midpoints of cells at a specific time frame in a global variable.
@@ -135,6 +159,7 @@ def all_my_midpoints(base_file,N_Cell):
         all_midpoints[i,1]=x1
     return
 
+@timeIt 
 def interpolate_phi_on_fine_grid(filename,filename_grid):
     grid_fine=read_vtu(filename_grid)
     phi=read_vtu(filename)
@@ -151,7 +176,7 @@ def interpolate_phi_on_fine_grid(filename,filename_grid):
     write_vtu(h,r"C:\Users\voglt\OneDrive\Desktop\researchProject\test.vtu")
     return
     
-
+@timeIt
 def resample_phi_on_fine_grid(filename,filename_grid):
     grid_fine=read_vtu(filename_grid)
     phi=read_vtu(filename)
@@ -164,12 +189,13 @@ def resample_phi_on_fine_grid(filename,filename_grid):
     #write_vtu(h,"/Users/Lea.Happel/Documents/Software_IWR/pAticsProject/team-project-p-atics/fine_meshes/test_interpolation.vtu")
     return VN.vtk_to_numpy(h.GetPointData().GetArray("phi"))
     
-
+@timeIt
 def read_fine_grid(file_grid):
     coords_grid,dummy_argument=extract_data(read_vtu(file_grid))
     print("coords_grid ",coords_grid.shape)
     return coords_grid
 
+@timeIt
 def recalculate_indices(N,coords_grid):
     global indices_phi,ind_phi_x,ind_phi_y,dx
     indices_phi=np.zeros((N+1,N+1),dtype=int)
@@ -185,6 +211,7 @@ def recalculate_indices(N,coords_grid):
         ind_phi_y[i]=y_coord
     print("i'm leaving")
     
+@timeIt
 def calculate_unsigned_dist(N,phi,value):
     phi_new=np.zeros((N+1,N+1))
     phi_new=phi[indices_phi]
@@ -194,12 +221,15 @@ def calculate_unsigned_dist(N,phi,value):
     unsigned_dist_resorted=unsigned_dist[ind_phi_x,ind_phi_y]
     return unsigned_dist_resorted
     
+@timeIt
 def all_my_distances(base_file,N,N_Cell,file_grid,value=0.2):
     coords_grid=read_fine_grid(file_grid)
     fine_grid_new=read_vtu(file_grid)
     recalculate_indices(N,coords_grid)
     
-    for i in range(N_Cell):
+    #TODO: rechange to commented line 
+    # for i in range(N_Cell):
+    for i in range(5):
         print("resample loop ",i)
         filename = os.path.join(base_file, "phasedata", f"phase_p{i}_20.000.vtu")
         phi_grid=resample_phi_on_fine_grid(filename,file_grid)
@@ -211,6 +241,7 @@ def all_my_distances(base_file,N,N_Cell,file_grid,value=0.2):
     all_my_vertices(fine_grid_new,N_Cell)
     return fine_grid_new
 
+@timeIt
 def adjust_point(ref,test_h):
     test=deepcopy(test_h)
     if (abs(test[0]-ref[0])>50.0):
@@ -225,15 +256,16 @@ def adjust_point(ref,test_h):
             test[1] -=100.0
     return test
 
+@timeIt
 def all_my_vertices(fine_grid,N_Cells,r=20.0):
     all_vertices_collected=defaultdict(list)
     #Later on:Double loop
-    for i in range(N_Cells):
+    for i in range(TESTNumberOfCells):
         print("NCells ",i)
     #NOW: get all the indices for which the midpoints are close
         possible_neighs=[]
         my_midpoint_i=all_midpoints[i,:]
-        for k in range(N_Cells):
+        for k in range(TESTNumberOfCells):
             if i != k:
                 other_midpoint=all_midpoints[k,:]
                 other_midpoint=adjust_point(my_midpoint_i,other_midpoint)
@@ -259,7 +291,7 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
             array_all=np.zeros((N_Cells,n_points))
             for k in range(n_points):
                 coords[k,0],coords[k,1],dummy_argument= contour.GetOutput().GetPoint(k)
-            for k in range(N_Cells):
+            for k in range(TESTNumberOfCells):
                 array_all[k,:]=VN.vtk_to_numpy(contour.GetOutput().GetPointData().GetArray("ud_"+str(k)))
             array_all=array_all -array_all[i,:][None,:]
             indices=np.where(array_all.max(axis=0)<=0.0)[0]
@@ -343,6 +375,10 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
 
 # WHAT DO YOU NEED FROM THE OTHER FILE
 # clean_and_collect_my_vertices
+
+
+# template for timetracking: println(f"Function1 time: {timeit.timeit(my_function, number=1):.4f} seconds")
+
 base_file=os.path.join(home,"OneDrive", "Desktop", "researchProject", "code", "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1")
 # filename1='/Users/Lea.Happel/Downloads/o20230614_set3_In3Ca3aa0ar0D0v5Al0Ga3Init1/phasedata/phase_p45_20.000.vtu'
 N_Cell=100
