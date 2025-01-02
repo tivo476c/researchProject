@@ -1,0 +1,94 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+%\usepackage{amsfonts}
+
+\title{Determination of vertices in cell models}
+\author{Tim Vogel}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+abstract
+\end{abstract}
+
+\section{Introduction}
+The arrangement of vertices within cellular structures plays a critical role in determining their mechanical and functional properties. Mathematical modeling of these vertices enables researchers to better understand phenomena ranging from tissue morphogenesis to artificial material design. Despite significant progress, challenges remain in accurately modeling vertex positions, particularly in irregular or dynamic cell configurations. Here, we aim to address these challenges by developing a robust framework for vertex determination that integrates theoretical principles and computational methods.
+
+\section{Description of the problem}
+We are provided with real-life data of biological cells, including sample images obtained from a suitable experimental setup. 
+Phase-field models of these cells have already been derived, representing a foundational abstraction of their structure. 
+The next step is to further simplify the cell model by computing polygonal representations, where vertices are defined as two-dimensional points and edges connect these points, forming polygonal structures.
+For individual cells, computing discrete polygonal shapes is straightforward. 
+However, complications arise when considering the system of all cells as a whole. 
+We aim to achieve a seamless, gapless configuration in which cells fit together perfectly without air pockets. 
+This requires shared vertices between adjacent cells, with some vertices being common to more than two cells.
+The primary focus of this work is to determine the positions of these shared vertices. 
+Although existing approaches, such as Voronoi models, address related problems, they do not fully align with the specific requirements of our system. 
+We will build upon this existing knowledge and develop an effective solution, including an efficient implementation for computational purposes.
+
+\section{Current code}
+
+The provided Python script implements a computational workflow for processing and analyzing biological cell models represented as 2D polygonal meshes. The script is tailored to simulate, extract, and analyze cell boundaries, focusing on shared vertices between neighboring cells. Below, the script's key components and workflow are described.
+
+\subsection{Purpose and Context}
+The script processes data related to biological cells, using the Visualization Toolkit (VTK) and other numerical libraries. It aims to:
+\begin{itemize}
+    \item Extract vertices and contours from cell data.
+    \item Interpolate and resample scalar fields (e.g., phase data) on a fine computational grid.
+    \item Compute distances and identify shared vertices between neighboring cells, accounting for periodic boundary conditions.
+\end{itemize}
+
+The workflow is customized for a specific research project and contains hardcoded parameters for integration into an existing computational setup.
+
+\subsection{Key Components and Functions}
+\begin{itemize}
+    \item \textbf{Setup and Imports}: 
+    The script imports various libraries, such as \texttt{vtk}, \texttt{numpy}, and \texttt{pandas}, for data manipulation and file handling. Paths to dependencies and output directories are predefined.
+
+    \item \textbf{Contour Extraction} (\texttt{calculateInnerContour}): 
+    This function extracts and organizes contour points from a scalar field within a VTK file, allowing for sorted representation of cell boundaries.
+
+    \item \textbf{Cell Midpoints} (\texttt{all\_my\_midpoints}): 
+    Midpoints for individual cells are calculated from positional data in CSV files for a fixed time frame.
+
+    \item \textbf{Scalar Field Processing}:
+    \begin{itemize}
+        \item \texttt{interpolate\_phi\_on\_fine\_grid}: Interpolates scalar field data onto a fine computational grid using a Gaussian kernel.
+        \item \texttt{resample\_phi\_on\_fine\_grid}: Resamples scalar fields onto a fine grid using VTK's resampling tools.
+    \end{itemize}
+
+    \item \textbf{Distance Computation}:
+    \begin{itemize}
+        \item \texttt{calculate\_unsigned\_dist}: Computes unsigned distance fields for a given scalar threshold using Fast Marching Methods.
+        \item \texttt{all\_my\_distances}: Computes distances between cells, appends them to the grid, and stores the data in output files.
+    \end{itemize}
+
+    \item \textbf{Vertex Identification} (\texttt{all\_my\_vertices}):
+    This function identifies shared vertices between cells by comparing unsigned distance functions. The identified vertices are adjusted for periodic boundary conditions and stored for further analysis.
+
+    \item \textbf{Utility Functions}:
+    \begin{itemize}
+        \item \texttt{adjust\_point}: Adjusts point coordinates to ensure periodicity.
+        \item \texttt{read\_fine\_grid}: Extracts grid coordinates from a VTK file.
+        \item \texttt{recalculate\_indices}: Maps fine grid coordinates to integer indices for efficient computation.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Workflow}
+\begin{enumerate}
+    \item \textbf{Input Data}: 
+    The script processes:
+    \
+
+
+
+\section{Improvements}
+
+\section{Results}
+
+\section{Outlook}
+
+\end{document}
