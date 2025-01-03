@@ -1,6 +1,5 @@
 # TODO 
 # add docstrings
-# move all needed paths that need to be set manually to the top
 
 
 #TODO: PATHS MUST BE SET MANUALLY BEFORE THE CODE CAN RUN  
@@ -38,26 +37,11 @@ import skfmm
 from vtk_append_data import append_np_array
 from collections import defaultdict
 from copy import deepcopy
-
-# for documenting the time performance difference 
 import time
-def time_it(func):
-    def wrapper(*args, **kwargs):
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        print(f"{func.__name__} executed in {end_time - start_time:.4f} seconds")
-        return result
-    return wrapper
 
 
-################################################## Testing parameters 
-# TODO: replace all TESTNumberOfCells with N_Cells
-TESTNumberOfCells = 5 
+### not used function: 
 
-
-
-@time_it 
 def calculateInnerContour(filename,value=0.2):
     """
     Calculates and extracts the inner contour of a 2D scalar field from a VTK unstructured grid file.
@@ -122,61 +106,12 @@ def calculateInnerContour(filename,value=0.2):
     
     return store_p,coords[np.array(all_indices_p),:]
 
-
-#!!!FRAME TIME IS HARDCODED
-@time_it 
-def all_my_midpoints(base_file,N_Cell):
+def interpolate_phi_on_fine_grid(name_coarse_grid, name_fine_grid):
     """
-    Computes and stores the midpoints of cells at a specific time frame in a global variable.
-
-    This function iterates over a series of cell data files, extracts the positions (`x0`, `x1`) 
-    at time `t=20` for each cell, and stores these midpoints in the global variable `all_midpoints`.
-
-    Args:
-        base_file (str): The base directory containing the cell position data files.
-        N_Cell (int): The total number of cells to process.
-
-    Side Effects:
-        - Creates or updates the global variable `all_midpoints`, 
-          which is a 2D numpy array of shape `(N_Cell, 2)`. 
-          Each row corresponds to the midpoint of a cell.
-
-    File Structure:
-        - Assumes the cell data files are stored in a subdirectory called `positions` 
-          under `base_file`, with filenames formatted as `neo_positions_p{i}.csv`.
-
-    Returns:
-        None
-
-    Notes:
-        - The function assumes the cell data CSV files have columns `time`, `x0`, and `x1`.
-        - It specifically processes data for the time frame where `time == 20`.
-
-    Example:
-        base_path = "/path/to/data"
-        total_cells = 10
-        all_my_midpoints(base_path, total_cells)
-        # After execution, `all_midpoints` contains the midpoints for all 10 cells.
+    Interpolates a the cell model for a given coarser grid on a finer grid. 
     """
-    print("Bla")
-    global all_midpoints
-    all_midpoints=np.zeros((N_Cell,2))
-    
-    for i in range(N_Cell):
-        filename =f"neo_positions_p{i}.csv" 
-        data_file = os.path.join(base_file, "positions", filename)
-        pos_phase=pd.read_csv(data_file)
-        frame_time=pos_phase[pos_phase["time"]==20]
-        x0=frame_time["x0"].iloc[0]
-        x1=frame_time["x1"].iloc[0]
-        all_midpoints[i,0]=x0
-        all_midpoints[i,1]=x1
-    return
-
-@time_it 
-def interpolate_phi_on_fine_grid(filename,filename_grid):
-    grid_fine=read_vtu(filename_grid)
-    phi=read_vtu(filename)
+    grid_fine=read_vtu(name_fine_grid)
+    phi=read_vtu(name_coarse_grid)
     kernel=vtk.vtkGaussianKernel()
     kernel.SetNullValue(-1.0)
     interpolator=vtk.vtkPointInterpolator()
@@ -189,28 +124,131 @@ def interpolate_phi_on_fine_grid(filename,filename_grid):
 
     write_vtu(h,r"C:\Users\voglt\OneDrive\Desktop\researchProject\test.vtu")
     return
+
+
+
+
+
+
+### used functions: 
+def time_it(func):
+    """
+    Wrapper for functions for outputting the execution time of a function call. 
+    """
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        print(f"{func.__name__} executed in {end_time - start_time:.4f} seconds")
+        return result
+    return wrapper
+
+#------------- compute cell midpoints -----------
+#!!!FRAME TIME IS HARDCODED
+@time_it 
+def all_my_midpoints(base_file,N_Cell):
+    """
+    Computes and stores the midpoints of cells at a specific time frame in a global variable.
+
+    This function iterates over a series of cell data files, extracts the positions (`x0`, `x1`) 
+    at time `t=20` for each cell, and stores these midpoints in the global variable `all_midpoints`.
+
+    Args:
+        base_file (str): The base directory containing the cell position data file.
+        N_Cell (int): The total number of cells to process.
+
+    Side Effects:
+        - Creates or updates the global variable `all_midpoints`, 
+          which is a 2D numpy array of shape `(N_Cell, 2)`. 
+          Each row corresponds to the midpoint of a cell.
+
+    Returns:
+        None
+
+    Notes:
+        - The function assumes the cell data CSV files have columns `time`, `x0`, and `x1`.
+        - It specifically processes data for the time frame where `time == 20`.
+
+    Example:
+        base_path = "/path/to/data"
+        N_cells = 10
+        all_my_midpoints(base_path, N_cells)
+        # After execution, `all_midpoints` contains the midpoints for all 10 cells.
+    """
+    global all_midpoints
+    all_midpoints = np.zeros((N_Cell,2))
     
+    for i in range(N_Cell):
+        filename = f"neo_positions_p{i}.csv" 
+        data_file = os.path.join(base_file, "positions", filename)
+        pos_phase = pd.read_csv(data_file)
+        frame_time = pos_phase[pos_phase["time"]==20]
+        x0 = frame_time["x0"].iloc[0]
+        x1 = frame_time["x1"].iloc[0]
+        all_midpoints[i,0] = x0
+        all_midpoints[i,1] = x1
+    return
+   
+#------------------------------------------------
+#------------ for resampling on finer grid ------
 @time_it
-def resample_phi_on_fine_grid(filename,filename_grid):
-    grid_fine=read_vtu(filename_grid)
-    phi=read_vtu(filename)
+def resample_phi_on_fine_grid(name_coarse_grid, name_fine_grid):
+    """        
+    Resamples a scalar field from a coarse source dataset onto a fine grid.
+
+    Returns:
+        np.ndarray: A 1d NumPy array containing the resampled scalar field values on the fine grid.
+    """
+    grid_fine=read_vtu(name_fine_grid)
+    phi=read_vtu(name_coarse_grid)
     interpolator=vtk.vtkResampleWithDataSet()
     interpolator.SetInputData(grid_fine.GetOutput())
     interpolator.SetSourceData(phi.GetOutput())
     interpolator.Update()
     h=interpolator.GetOutput()
-    #print(h)
-    #write_vtu(h,"/Users/Lea.Happel/Documents/Software_IWR/pAticsProject/team-project-p-atics/fine_meshes/test_interpolation.vtu")
-    return VN.vtk_to_numpy(h.GetPointData().GetArray("phi"))
+    res = VN.vtk_to_numpy(h.GetPointData().GetArray("phi"))
+    print(f"Shape of res in resample_phi_on_fine_grid: {res.shape}")
+    return res 
     
 @time_it
-def read_fine_grid(file_grid):
-    coords_grid,dummy_argument=extract_data(read_vtu(file_grid))
-    print("coords_grid ",coords_grid.shape)
+def read_fine_grid(path_grid_file):
+    """
+    Reads the coordinates of a grid from a VTK file.
+
+    Args:
+        path_grid_file (str): Path to the VTK file containing the fine grid data.
+
+    Returns:
+        np.ndarray: The coordinates of the grid points as a 2D NumPy array.
+    """
+    coords_grid,_=extract_data(read_vtu(path_grid_file))
+    print("coords_grid.shape = ", coords_grid.shape)
     return coords_grid
 
 @time_it
 def recalculate_indices(N,coords_grid):
+    """
+    Calculates and stores the indices mapping each point in a grid to its 
+    corresponding position in a 2D index array. It also stores the x and y coordinates 
+    of each grid point in separate 1D arrays.
+
+    Args:
+        N (int): The number of grid divisions (grid resolution).
+        coords_grid (np.ndarray): A 2D NumPy array of shape (M, 2) containing the 
+                                  coordinates of grid points, where M is the number 
+                                  of points in the grid.
+
+    Side Effects:
+        - Updates global arrays:
+            - `indices_phi`: A 2D array mapping grid positions to point indices.
+            - `ind_phi_x`: A 1D array storing the x-coordinates of the grid points.
+            - `ind_phi_y`: A 1D array storing the y-coordinates of the grid points.
+            - `dx`: The grid spacing computed as the upper bound divided by `N`.
+
+    Example:
+        recalculate_indices(100, coords_grid)
+        # Updates global variables with recalculated indices and coordinates.
+    """
     global indices_phi,ind_phi_x,ind_phi_y,dx
     indices_phi=np.zeros((N+1,N+1),dtype=int)
     ind_phi_x=np.zeros((N+1)*(N+1),dtype=int)
@@ -223,27 +261,62 @@ def recalculate_indices(N,coords_grid):
         indices_phi[x_coord,y_coord]=i
         ind_phi_x[i]=x_coord
         ind_phi_y[i]=y_coord
-    print("i'm leaving")
+    #print("i'm leaving")
     
+#------------------------------------------------
+
+
 @time_it
 def calculate_unsigned_dist(N,phi,value):
-    phi_new=np.zeros((N+1,N+1))
-    phi_new=phi[indices_phi]
-    phi_new -=value
-    unsigned_dist=skfmm.distance(phi_new,dx=np.array([dx,dx]),periodic=True)
-    unsigned_dist_resorted=np.zeros((N+1)*(N+1))
-    unsigned_dist_resorted=unsigned_dist[ind_phi_x,ind_phi_y]
+    """
+    Calculates the unsigned distance field based on a given scalar field and value.
+
+    Args:
+        N (int): The grid resolution.
+        phi (np.ndarray): A 2D NumPy array representing the scalar field.
+        value (float): The value used to compute the unsigned distance from the scalar field.
+
+    Returns:
+        np.ndarray: A 1D NumPy array containing the unsigned distance field.
+    """
+
+    phi_new = np.zeros((N+1,N+1))
+    phi_new = phi[indices_phi]
+    phi_new -= value
+    unsigned_dist = skfmm.distance(phi_new,dx=np.array([dx,dx]),periodic=True)
+    unsigned_dist_resorted = np.zeros((N+1)*(N+1))
+    unsigned_dist_resorted = unsigned_dist[ind_phi_x,ind_phi_y]
     return unsigned_dist_resorted
     
 @time_it
 def all_my_distances(base_file,N,N_Cell,file_grid,value=0.2):
-    coords_grid=read_fine_grid(file_grid)
-    fine_grid_new=read_vtu(file_grid)
+    """
+    Computes and appends the unsigned distance field for multiple phases to a fine grid.
+
+    This function processes multiple phase data files (`phase_p{i}_20.000.vtu`), resamples 
+    the `phi` values onto a fine grid, calculates the unsigned distance for each phase using a 
+    threshold value, and appends the results to the fine grid. The modified fine grid is then written 
+    to an output file, and additional vertex information is computed.
+
+    Args:
+        base_file (str): Path to the directory containing the phase data files.
+        N (int): The resolution of the new finer grid.
+        N_Cell (int): The total number of phases/cells to process.
+        file_grid (str): Path to the fine grid file.
+        value (float, optional): The threshold value for calculating the unsigned distance field. 
+                                 Default is 0.2.
+
+    Returns:
+        vtk.vtkPolyData: The modified fine grid with the appended unsigned distance fields.
+
+    Example:
+        fine_grid = all_my_distances(base_file, 100, 10, "fine_grid.vtu", 0.2)
+    """
+    coords_grid = read_fine_grid(file_grid)
+    fine_grid_new = read_vtu(file_grid)
     recalculate_indices(N,coords_grid)
     
-    #TODO: rechange to commented line 
-    # for i in range(N_Cell):
-    for i in range(5):
+    for i in range(N_Cell):
         print("resample loop ",i)
         filename = os.path.join(base_file, "phasedata", f"phase_p{i}_20.000.vtu")
         phi_grid=resample_phi_on_fine_grid(filename,file_grid)
@@ -254,8 +327,10 @@ def all_my_distances(base_file,N,N_Cell,file_grid,value=0.2):
     all_my_vertices(fine_grid_new,N_Cell)
     return fine_grid_new
 
-@time_it
 def adjust_point(ref,test_h):
+    """
+    Adjusts test point's coordinates to ensure they are within a 100-unit range of the reference point.
+    """
     test=deepcopy(test_h)
     if (abs(test[0]-ref[0])>50.0):
         if test[0] < ref[0]:
@@ -271,14 +346,32 @@ def adjust_point(ref,test_h):
 
 @time_it
 def all_my_vertices(fine_grid,N_Cells,r=20.0):
+    """
+    Collects and saves the vertices of common boundaries between neighboring cells based on midpoints.
+
+    This function iterates through multiple cells, computes potential neighbors based on the distance 
+    between their midpoints, and identifies common boundaries between neighboring cells. For each 
+    pair of neighboring cells, the function calculates the boundary, adjusts the coordinates if necessary, 
+    and stores the vertices of the common boundary. These vertices are saved as `.npy` files for each cell.
+
+    Args:
+        fine_grid (vtk.vtkPolyData): The fine grid containing the scalar field data.
+        N_Cells (int): The number of cells or phases to process.
+        r (float, optional): The threshold distance for considering neighboring cells based on their midpoints.
+                             Default is 20.0 units.
+
+    Side Effects:
+        - Saves `.npy` files for each cell's boundary vertices in the directory specified by `dir_vertices`.
+    """
     all_vertices_collected=defaultdict(list)
     #Later on:Double loop
-    for i in range(TESTNumberOfCells):
+    for i in range(N_Cells):
         print("NCells ",i)
     #NOW: get all the indices for which the midpoints are close
         possible_neighs=[]
         my_midpoint_i=all_midpoints[i,:]
-        for k in range(TESTNumberOfCells):
+        # TODO: do k>i here!!!
+        for k in range(N_Cells):
             if i != k:
                 other_midpoint=all_midpoints[k,:]
                 other_midpoint=adjust_point(my_midpoint_i,other_midpoint)
@@ -304,7 +397,7 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
             array_all=np.zeros((N_Cells,n_points))
             for k in range(n_points):
                 coords[k,0],coords[k,1],dummy_argument= contour.GetOutput().GetPoint(k)
-            for k in range(TESTNumberOfCells):
+            for k in range(N_Cells):
                 array_all[k,:]=VN.vtk_to_numpy(contour.GetOutput().GetPointData().GetArray("ud_"+str(k)))
             array_all=array_all -array_all[i,:][None,:]
             indices=np.where(array_all.max(axis=0)<=0.0)[0]
@@ -390,18 +483,21 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
 # clean_and_collect_my_vertices
 
 
-# template for timetracking: println(f"Function1 time: {timeit.timeit(my_function, number=1):.4f} seconds")
 
 # filename1='/Users/Lea.Happel/Downloads/o20230614_set3_In3Ca3aa0ar0D0v5Al0Ga3Init1/phasedata/phase_p45_20.000.vtu'
 
-N_Cell=100
-eps=0.1
+# number of cells 
+# TODO: reset N_Cell = 100 
+N_Cell = 5
+
+eps = 0.1
 filename = f"vertices_not_cleaned_eps_{eps}"
 dir_vertices=os.path.join(Base_path, filename)
 if not os.path.exists(dir_vertices):
     os.mkdir(dir_vertices)
 
-N=1000
+# grid resolution
+N = 1000
 all_my_midpoints(Base_path,N_Cell)
 print(all_midpoints)
 all_my_distances(Base_path,N,N_Cell,Grid_path,eps)
