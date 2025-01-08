@@ -130,10 +130,6 @@ def interpolate_phi_on_fine_grid(name_coarse_grid, name_fine_grid):
     return
 
 
-
-
-
-
 ### used functions: 
 def time_it(func):
     """
@@ -267,7 +263,8 @@ def recalculate_indices(N,coords_grid):
         ind_phi_y[i]=y_coord
     #print("i'm leaving")
     
-#------------------------------------------------
+#-------------------------------------------------
+#-- distances and vertices of neighboring cells --
 
 
 @time_it
@@ -375,7 +372,8 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
         possible_neighs=[]
         my_midpoint_i=all_midpoints[i,:]
         # TODO: do k>i here!!!
-        for k in range(N_Cells):
+        for k in range(i+1, N_Cells):
+            print(f"i = {i}, k = {k}")
             if i != k:
                 other_midpoint=all_midpoints[k,:]
                 other_midpoint=adjust_point(my_midpoint_i,other_midpoint)
@@ -458,7 +456,8 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
         my_points_i=np.array(all_vertices_collected[i])
         np.save(dir_vertices+'/phase_'+str(i),my_points_i)
         
-    
+#-------------------------------------------------
+
 
 # THIS FILE CONTAINS MULTIPLE HARDCODED THINGS WHICH MIGHT BE BENEFICIAL TO REMOVE
 # The periodicity of 100 is hardcoded
