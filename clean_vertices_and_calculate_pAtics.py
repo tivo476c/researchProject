@@ -1,45 +1,45 @@
+"""
+PREREQUISITS: the following directories and files must be saved in the executing system: 
+* vtk-suite
+* phase field input file "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1"
+* output directory
+* Method3_Sethian_Saye.py must be in the same directory as this file 
+
+THE PATHS TO THESE FILES MUST BE SET MANUALLY IN THE NEXT LINES 
+"""
+
+import sys
+import os
+from pathlib import Path
+
+home = Path.home()
+# path to VTK suite:
+VTK_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code", "vtk-suite")
+sys.path.append(VTK_path)
+
+# path for input file 
+Base_path = os.path.join(home, "OneDrive", "Desktop", "researchProject", "code", "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1")
+# Base_path='/Users/Lea.Happel/Downloads/o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1/'
+
+# path for plot_m1 to save the plot to 
+Output_path = os.path.join(home, "OneDrive", "Desktop", "researchProject", "code", "output") 
+# Pic_path = "/Users/Lea.Happel/Documents/Software_IWR/pAticsProject/team-project-p-atics/Pictures_Data_Harish/m3_p_"
+
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from copy import deepcopy
-import sys
-import os
-import pandas as pd
-#PATH TO Jans VTK Suite
-sys.path.append(os.path.abspath("/Users/Lea.Happel/Documents/Software_IWR/Auswertungsfunktionen/vtk-suite"))
+
 from np_sorting_points import sort2d
-from plotting_methods import get_pAtic_star
-from pfold_orientation_methods import calculate_shapefct_components_with_midpoint
+# from pfold_orientation_methods import calculate_shapefct_components_with_midpoint
+# from plotting_methods import get_pAtic_star
 
-def all_my_midpoints(base_file,N_Cell):
-    print("Bla")
-    global all_midpoints
-    all_midpoints=np.zeros((N_Cell,2))
-    
-    for i in range(N_Cell):
-        data_file=base_file+"positions/neo_positions_p"+str(i)+".csv"
-        pos_phase=pd.read_csv(data_file)
-        frame_time=pos_phase[pos_phase["time"]==20]
-        x0=frame_time["x0"].iloc[0]
-        x1=frame_time["x1"].iloc[0]
-        all_midpoints[i,0]=x0
-        all_midpoints[i,1]=x1
-    return
-
-def adjust_point(ref,test_h):
-    test=deepcopy(test_h)
-    if (abs(test[0]-ref[0])>50.0):
-        if test[0] < ref[0]:
-            test[0]+=100.0
-        else:
-            test[0] -=100.0
-    if (abs(test[1]-ref[1])>50.0):
-        if test[1] < ref[1]:
-            test[1]+=100.0
-        else:
-            test[1] -=100.0
-    return test
+from Method3_Sethian_Saye import all_my_midpoints, adjust_point, time_it
 
 
+
+
+@time_it
 def clean_and_collect_my_vertices(base_vertices,N_Cell):
     clean_vertices=[]
     for i in range(N_Cell):
@@ -62,6 +62,8 @@ def clean_and_collect_my_vertices(base_vertices,N_Cell):
         #plt.scatter(clean_array[:,0],clean_array[:,1])
         #plt.show()
     return clean_vertices
+
+### following functions are just for plotting and i must not touch them  ---------------------------------
 
 def m1_for_one_set(coords,midpoint,p=3):
     n_points=coords.shape[0]
@@ -168,16 +170,15 @@ def collect_and_post_process_m1(dirname,base_vertices,pic_filename,NumberOfCells
         plt.savefig(pic_filename+str(p)+'.svg',transparent=True,dpi=600)
         plt.show()
     
+# --------------------------------------------------------------------------------------------------------
 
-
-N_Cell=100
+#TODO: N_Cell=100
+N_Cell=5
 eps=0.1
 tol=2*0.1*np.sqrt(2)
-base_dir='/Users/Lea.Happel/Downloads/o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1/'
-base_vertices=base_dir+'vertices_not_cleaned_eps_'+str(eps)
-#all_my_midpoints(base_dir,N_Cell):
-#clean_and_collect_my_vertices(base_vertices,N_Cell)
+base_vertices = os.path.join(Base_path, 'vertices_not_cleaned_eps_'+str(eps))
+all_my_midpoints(Base_path,N_Cell)
+clean_and_collect_my_vertices(base_vertices,N_Cell)
 
-#plot_m1(base_dir,base_vertices,"/Users/Lea.Happel/Documents/Software_IWR/pAticsProject/team-project-p-atics/Pictures_Data_Harish/m3_p_",N_Cell,[2,3,4,5,6])
-collect_and_post_process_m1(base_dir,base_vertices,"/Users/Lea.Happel/Documents/Software_IWR/pAticsProject/team-project-p-atics/Pictures_Data_Harish/m3_p_",N_Cell,[2,3,4,5,6],'darkorange')
-
+#plot_m1(Base_path,base_vertices,"/Users/Lea.Happel/Documents/Software_IWR/pAticsProject/team-project-p-atics/Pictures_Data_Harish/m3_p_",N_Cell,[2,3,4,5,6])
+#collect_and_post_process_m1(Base_path,base_vertices,Output_path,N_Cell,[2,3,4,5,6],'darkorange')

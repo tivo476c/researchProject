@@ -1,8 +1,13 @@
-# TODO 
-# add docstrings
+"""
+PREREQUISITS: the following directories and files must be saved in the executing system: 
+* vtk-suite
+* phase field input file "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1"
+* fine grid file "grid_Harish_1000_1000.vtu"
+* .vtu file for saving unsigned distances "test_all_unsigned_dist.vtu"
 
+THE PATHS TO THESE FILES MUST BE SET MANUALLY IN THE NEXT LINES 
+"""
 
-#TODO: PATHS MUST BE SET MANUALLY BEFORE THE CODE CAN RUN  
 from pathlib import Path
 import os
 import sys
@@ -13,15 +18,14 @@ home = Path.home()
 VTK_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code", "vtk-suite")
 sys.path.append(VTK_path)
 
-# path for saving output/test_all_unsigned_dist.vtu
-Write_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code", "output", "test_all_unsigned_dist.vtu")
-
 # path for input file 
 Base_path = os.path.join(home, "OneDrive", "Desktop", "researchProject", "code", "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1")
 
 # path to grid 
 Grid_path = os.path.join(home,"OneDrive", "Desktop", "researchProject", "code", "grid_Harish_1000_1000.vtu")
 
+# path for saving output/test_all_unsigned_dist.vtu
+Write_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code", "output", "test_all_unsigned_dist.vtu")
 
 
 import numpy as np
@@ -121,8 +125,8 @@ def interpolate_phi_on_fine_grid(name_coarse_grid, name_fine_grid):
     interpolator.Update()
     h=interpolator.GetOutput()
     print(h)
-
-    write_vtu(h,r"C:\Users\voglt\OneDrive\Desktop\researchProject\test.vtu")
+    # set write path as you want 
+    write_vtu(h,r"test.vtu")
     return
 
 
