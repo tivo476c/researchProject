@@ -373,12 +373,13 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
         my_midpoint_i=all_midpoints[i,:]
         # TODO: do k>i here!!!
         for k in range(i+1, N_Cells):
+        #for k in range(N_Cells):
             print(f"i = {i}, k = {k}")
-            if i != k:
-                other_midpoint=all_midpoints[k,:]
-                other_midpoint=adjust_point(my_midpoint_i,other_midpoint)
-                if (np.linalg.norm(my_midpoint_i-other_midpoint)<r):
-                    possible_neighs.append(k)
+            
+            other_midpoint=all_midpoints[k,:]
+            other_midpoint=adjust_point(my_midpoint_i,other_midpoint)
+            if (np.linalg.norm(my_midpoint_i-other_midpoint)<r):
+                possible_neighs.append(k)
             
         for j in possible_neighs:
             print("current j is ",j)
@@ -491,23 +492,29 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
 
 # number of cells 
 # TODO: reset N_Cell = 100 
-N_Cell = 5
 
-eps = 0.1
-filename = f"vertices_not_cleaned_eps_{eps}"
-dir_vertices=os.path.join(Base_path, filename)
-if not os.path.exists(dir_vertices):
-    os.mkdir(dir_vertices)
+@time_it
+def main():
+    N_Cell = 5
 
-# grid resolution
-N = 1000
-all_my_midpoints(Base_path,N_Cell)
-print(all_midpoints)
-all_my_distances(Base_path,N,N_Cell,Grid_path,eps)
+    eps = 0.1
+    filename = f"vertices_not_cleaned_eps_{eps}"
+    global dir_vertices
+    dir_vertices = os.path.join(Base_path, filename)
+    if not os.path.exists(dir_vertices):
+        os.mkdir(dir_vertices)
 
-# c,d_a=calculateInnerContour(filename1)
-# print("c",c)
-# print("d_a",d_a)
-# plt.plot(d_a[:,0],d_a[:,1])
-# plt.show()
-# exit()
+    # grid resolution
+    N = 1000
+    all_my_midpoints(Base_path,N_Cell)
+    print(all_midpoints)
+    all_my_distances(Base_path,N,N_Cell,Grid_path,eps)
+
+    # c,d_a=calculateInnerContour(filename1)
+    # print("c",c)
+    # print("d_a",d_a)
+    # plt.plot(d_a[:,0],d_a[:,1])
+    # plt.show()
+    # exit()
+
+main()

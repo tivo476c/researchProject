@@ -42,12 +42,15 @@ from Method3_Sethian_Saye import all_my_midpoints, adjust_point, time_it
 @time_it
 def clean_and_collect_my_vertices(base_vertices,N_Cell):
     clean_vertices=[]
-    for i in range(N_Cell):
-        clean_i=[]
+    for i in range(N_Cell-1):
+        print(f"i in clean and collect my vertices = {i}")
+        clean_i=[] 
         dirty_i=np.load(base_vertices+'/phase_'+str(i)+'.npy')
+        print(f"dirty_i = {dirty_i}")
+        print(dirty_i[0,:])
         clean_i.append(dirty_i[0,:])
         for j in range(1,dirty_i.shape[0]):
-            append_j=True
+            append_j=True 
             for k in clean_i:
                 #shift dirty_i[j,:] to the same side as k
                 dirty_vec_j=adjust_point(k,dirty_i[j,:])
@@ -172,13 +175,19 @@ def collect_and_post_process_m1(dirname,base_vertices,pic_filename,NumberOfCells
     
 # --------------------------------------------------------------------------------------------------------
 
-#TODO: N_Cell=100
-N_Cell=5
-eps=0.1
-tol=2*0.1*np.sqrt(2)
-base_vertices = os.path.join(Base_path, 'vertices_not_cleaned_eps_'+str(eps))
-all_my_midpoints(Base_path,N_Cell)
-clean_and_collect_my_vertices(base_vertices,N_Cell)
+@time_it 
+def main():
+    #TODO: N_Cell=100
+    N_Cell=5
+    eps=0.1
+    global tol 
+    tol=2*0.1*np.sqrt(2)
+    global base_vertices
+    base_vertices = os.path.join(Base_path, 'vertices_not_cleaned_eps_'+str(eps))
+    all_my_midpoints(Base_path,N_Cell)
+    clean_and_collect_my_vertices(base_vertices,N_Cell)
 
-#plot_m1(Base_path,base_vertices,"/Users/Lea.Happel/Documents/Software_IWR/pAticsProject/team-project-p-atics/Pictures_Data_Harish/m3_p_",N_Cell,[2,3,4,5,6])
-#collect_and_post_process_m1(Base_path,base_vertices,Output_path,N_Cell,[2,3,4,5,6],'darkorange')
+    #plot_m1(Base_path,base_vertices,"/Users/Lea.Happel/Documents/Software_IWR/pAticsProject/team-project-p-atics/Pictures_Data_Harish/m3_p_",N_Cell,[2,3,4,5,6])
+    #collect_and_post_process_m1(Base_path,base_vertices,Output_path,N_Cell,[2,3,4,5,6],'darkorange')
+
+main()
