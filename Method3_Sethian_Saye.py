@@ -4,6 +4,7 @@ PREREQUISITS: the following directories and files must be saved in the executing
 * phase field input file "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1"
 * fine grid file "grid_Harish_1000_1000.vtu"
 * .vtu file for saving unsigned distances "test_all_unsigned_dist.vtu"
+* directory that holds all fine grids for all cells 
 
 THE PATHS TO THESE FILES MUST BE SET MANUALLY IN THE NEXT LINES 
 """
@@ -27,6 +28,14 @@ Grid_path = os.path.join(home,"OneDrive", "Desktop", "researchProject", "code", 
 # path for saving output/test_all_unsigned_dist.vtu
 Write_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code", "output", "test_all_unsigned_dist.vtu")
 
+# path to fine grid directory 
+Fine_grids_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code", "all_new_fine_grids")
+
+# path to input example file 
+Example_grid_path = os.path.join(Base_path, "phasedata", "phase_p45_20.000.vtu")
+
+'/Users/Lea.Happel/Downloads/o20230614_set3_In3Ca3aa0ar0D0v5Al0Ga3Init1/phasedata/phase_p45_20.000.vtu'
+
 
 import numpy as np
 import vtk
@@ -37,6 +46,8 @@ from vtk_read_write import read_vtu, write_vtu
 from vtk_convert import extract_data
 from np_sorting_points import sort2d, sort2d_with_key
 from vtk.util import numpy_support as VN
+from vtk.util.numpy_support import numpy_to_vtk
+
 import skfmm
 from vtk_append_data import append_np_array
 from collections import defaultdict
@@ -89,7 +100,7 @@ def calculateInnerContour(filename,value=0.2):
     n_points = contour.GetOutput().GetNumberOfPoints()
     coords = np.zeros((n_points,2))
     for i in range(n_points):
-        coords[i,0],coords[i,1],dummy_argument= contour.GetOutput().GetPoint(i)
+        coords[i,0],coords[i,1],_= contour.GetOutput().GetPoint(i)
     lines=stripper.GetOutput().GetLines()
     points=stripper.GetOutput().GetPoints()
     lines.InitTraversal()
@@ -458,8 +469,121 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
         np.save(dir_vertices+'/phase_'+str(i),my_points_i)
         
 #-------------------------------------------------
+#------------- new functionalities ---------------
+
+def create_and_save_uniform_triangular_grids(grid_length, output_path, N_Cells, N_resolution):
+    """
+    Creates uniform triangular grids with specified resolution and saves them as `.vtu` files.
+
+    Args:
+        input_length_path (str): Path to the `.vtu` file used to determine the grid's length.
+        output_path (str): Directory where the grids will be saved.
+        N_Cells (int): Number of identical grids to generate.
+        N_resolution (int): Resolution of the grids (N_resolution x N_resolution).
+
+    Returns:
+        bool: True if successful, False otherwise.
+    """
+    try:
+        # Ensure the output directory exists
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+
+        # Create the uniform grid points
+        x_coords = np.linspace(0, grid_length, N_resolution)
+        y_coords = np.linspace(0, grid_length, N_resolution)
+
+        points = vtk.vtkPoints()
+        for y in y_coords:
+            for x in x_coords:
+                points.InsertNextPoint(x, y, 0)
+
+        # Define the triangular cells
+        grid = vtk.vtkUnstructuredGrid()
+        grid.SetPoints(points)
+
+        for j in range(N_resolution - 1):
+            for i in range(N_resolution - 1):
+                pt1 = j * N_resolution + i
+                pt2 = pt1 + 1
+                pt3 = pt1 + N_resolution
+                pt4 = pt3 + 1
+
+                # Create two triangles for each square in the grid
+                triangle1 = vtk.vtkTriangle()
+                triangle1.GetPointIds().SetId(0, pt1)
+                triangle1.GetPointIds().SetId(1, pt2)
+                triangle1.GetPointIds().SetId(2, pt4)
+
+                triangle2 = vtk.vtkTriangle()
+                triangle2.GetPointIds().SetId(0, pt1)
+                triangle2.GetPointIds().SetId(1, pt4)
+                triangle2.GetPointIds().SetId(2, pt3)
+
+                grid.InsertNextCell(triangle1.GetCellType(), triangle1.GetPointIds())
+                grid.InsertNextCell(triangle2.GetCellType(), triangle2.GetPointIds())
+
+        # Save the grid to `.vtu` files
+        for i in range(N_Cells):
+            file_name = os.path.join(output_path, f"fine_mesh_{i}.vtu")
+
+            writer = vtk.vtkXMLUnstructuredGridWriter()
+            writer.SetFileName(file_name)
+            writer.SetInputData(grid)
+            writer.Write()
+
+        return True
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+
+#----------------Helper Functions----------------- 
+#  (assumes existence of read_vtu and write_vtu)
+def read_vtu(file_path):
+    reader = vtk.vtkXMLUnstructuredGridReader()
+    reader.SetFileName(file_path)
+    reader.Update()
+    return reader
+
+def write_vtu(grid, file_path):
+    writer = vtk.vtkXMLUnstructuredGridWriter()
+    writer.SetFileName(file_path)
+    writer.SetInputData(grid)
+    writer.Write()
+
+def read_vtu_length(path):
+    """
+    Reads a `.vtu` file and calculates the length of the grid.
+    
+    Args:
+        path (str): Path to the `.vtu` file.
+
+    Returns:
+        float: Length of the grid.
+    """
+    try:
+        reader = vtk.vtkXMLUnstructuredGridReader()
+        reader.SetFileName(path)
+        reader.Update()
+        grid = reader.GetOutput()
+
+        # Extract bounding box
+        bounds = grid.GetBounds()  # [xmin, xmax, ymin, ymax, zmin, zmax]
+        length_x = bounds[1] - bounds[0]
+        length_y = bounds[3] - bounds[2]
+        length = max(length_x, length_y)
+
+        return length
+
+    except Exception as e:
+        print(f"Error reading VTU length: {e}")
+        return None
+
+#-------------------------------------------------
 
 
+ 
 # THIS FILE CONTAINS MULTIPLE HARDCODED THINGS WHICH MIGHT BE BENEFICIAL TO REMOVE
 # The periodicity of 100 is hardcoded
 # Filenames for tests are hardcoded
@@ -488,12 +612,9 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
 
 
 
-# filename1='/Users/Lea.Happel/Downloads/o20230614_set3_In3Ca3aa0ar0D0v5Al0Ga3Init1/phasedata/phase_p45_20.000.vtu'
-
 # number of cells 
 # TODO: reset N_Cell = 100 
 
-@time_it
 def main():
     N_Cell = 5
 
@@ -508,6 +629,7 @@ def main():
     N = 1000
     all_my_midpoints(Base_path,N_Cell)
     print(all_midpoints)
+    #  TODO: go on 
     all_my_distances(Base_path,N,N_Cell,Grid_path,eps)
 
     # c,d_a=calculateInnerContour(filename1)
@@ -517,4 +639,12 @@ def main():
     # plt.show()
     # exit()
 
-main()
+#### playground 
+N_Cells = 5 
+old_vtu_length = read_vtu_length(Example_grid_path)
+N_fine_resolution = 400 
+grid_length = 0.4 * old_vtu_length
+
+create_and_save_uniform_triangular_grids(grid_length, Fine_grids_path, N_Cells, N_fine_resolution)
+
+# TODO: next: go inside of all_my_distances(Base_path,N,N_Cell,Grid_path,eps) and adjust it so that it works with the fine meshes that are created 
