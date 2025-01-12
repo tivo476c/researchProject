@@ -23,7 +23,7 @@ sys.path.append(VTK_path)
 Base_path = os.path.join(home, "OneDrive", "Desktop", "researchProject", "code", "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1")
 
 # path to grid 
-Grid_path = os.path.join(home,"OneDrive", "Desktop", "researchProject", "code", "grid_Harish_1000_1000.vtu")
+Grid_path_1000 = os.path.join(home,"OneDrive", "Desktop", "researchProject", "code", "grid_Harish_1000_1000.vtu")
 
 # path for saving output/test_all_unsigned_dist.vtu
 Write_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code", "output", "test_all_unsigned_dist.vtu")
@@ -196,26 +196,208 @@ def all_my_midpoints(base_file,N_Cell):
         all_midpoints[i,1] = x1
     return
 
-def resample_phi_on_fine_grid(name_coarse_grid, name_fine_grid):
+def resample_phi_on_fine_grid(path_phi, path_fine_grid, i):
     """        
-    Just Input here: subdomain of interest as name_coarse_grid -> how to cut out subdomain?
+    Saves all phi values of the domain
 
     Resamples a scalar field from a coarse source dataset onto a fine grid.
 
     Returns:
         np.ndarray: A 1d NumPy array containing the resampled scalar field values on the fine grid.
     """
-    grid_fine=read_vtu(name_fine_grid)
-    phi=read_vtu(name_coarse_grid)
-    interpolator=vtk.vtkResampleWithDataSet()
-    interpolator.SetInputData(grid_fine.GetOutput())
-    interpolator.SetSourceData(phi.GetOutput())
+    grid_fine = read_vtu(path_fine_grid).GetOutput()
+    phi = read_vtu(path_phi).GetOutput()
+
+    midpoint_selected = all_midpoints[i]
+    print(f"selected midpoint = {midpoint_selected}")
+
+    # TODO: make sure that periodic boundary condition is considered 
+    bounds = [
+        midpoint_selected[0] - 20, midpoint_selected[0] + 20,
+        midpoint_selected[1] - 20, midpoint_selected[1] + 20
+    ]
+
+    extracted_grid, extracted_phi = extract_phi(phi, midpoint_selected[0]-20, midpoint_selected[0]+20, midpoint_selected[1]-20, midpoint_selected[1]+20)
+    bounds = extracted_grid.GetBounds()  # Returns (xmin, xmax, ymin, ymax, zmin, zmax)
+
+    # Print the bounds
+    print("Bounds of the extracted grid:")
+    print(f"xmin: {bounds[0]}, xmax: {bounds[1]}")
+    print(f"ymin: {bounds[2]}, ymax: {bounds[3]}")
+    print(f"zmin: {bounds[4]}, zmax: {bounds[5]}")
+
+    return extracted_phi
+    
+    
+    """    
+    # TODO: make sure that extracted_phi has size of 40x40 or just correct coordinates  
+
+    print(f"Selected midpoint: {midpoint_selected}, Subdomain bounds: {bounds}")
+
+    # transform fine grid so that it has the coordinates midpoint[i] + [-20,20]
+    fine_bounds = grid_fine.GetBounds()
+    transform = vtk.vtkTransform()
+    transform.Translate(bounds[0] - fine_bounds[0], bounds[2] - fine_bounds[2], 0)
+    transform_filter = vtk.vtkTransformFilter()
+    transform_filter.SetInputData(grid_fine)
+    transform_filter.SetTransform(transform)
+    transform_filter.Update()
+    grid_fine = transform_filter.GetOutput()
+    fine_bounds = grid_fine.GetBounds()
+    print(f"Transformed fine grid bounds: {fine_bounds}")
+
+    assert (
+        abs(fine_bounds[0] - bounds[0]) < 1e-5 and
+        abs(fine_bounds[1] - bounds[1]) < 1e-5 and
+        abs(fine_bounds[2] - bounds[2]) < 1e-5 and
+        abs(fine_bounds[3] - bounds[3]) < 1e-5
+    ), "Fine grid does not align with the specified subdomain bounds."
+
+    interpolator = vtk.vtkResampleWithDataSet()
+    interpolator.SetInputData(grid_fine)
+    interpolator.SetSourceData(wrapped_phi)
     interpolator.Update()
     h=interpolator.GetOutput()
     res = VN.vtk_to_numpy(h.GetPointData().GetArray("phi"))
     print(f"Shape of res in resample_phi_on_fine_grid: {res.shape}")
     return res 
+    """
+
+def extract_phi(phi, x_min, x_max, y_min, y_max, Lx=100, Ly=100):
+    """
+    Extracts the scalar field `phi` from a given grid, considering periodic boundary conditions.
     
+    Args:
+        phi (vtkUnstructuredGrid): The VTK grid containing the scalar field.
+        x_min, x_max (float): Bounds in the x-direction (can be outside the domain [0, Lx]).
+        y_min, y_max (float): Bounds in the y-direction (can be outside the domain [0, Ly]).
+        Lx, Ly (float): Domain size in the x and y directions (default is [0, 100]).
+
+    Returns:
+        np.ndarray: The scalar field values for the extracted subdomain considering periodicity.
+    """
+    print(f"x_min = {x_min}")
+    print(f"x_max = {x_max}")
+    print(f"y_min = {y_min}")
+    print(f"y_max = {y_max}")
+    
+    # Apply periodic boundary conditions to the bounds
+    x_min_wrapped = x_min  % 100
+    x_max_wrapped = x_max  % 100
+    y_min_wrapped = y_min  % 100
+    y_max_wrapped = y_max  % 100
+
+    print(f"x_min_wrapped = {x_min_wrapped}")
+    print(f"x_max_wrapped = {x_max_wrapped}")
+    print(f"y_min_wrapped = {y_min_wrapped}")
+    print(f"y_max_wrapped = {y_max_wrapped}")
+
+    # Extract the region within the wrapped bounds
+    extracted_grids = []
+
+    # Controll x_interval
+    x_intervals = []
+    if x_min_wrapped < x_max_wrapped:
+        # no wrapping needed 
+        x_intervals.append([x_min_wrapped, x_max_wrapped])
+    else:
+        # Extract intervals from the left and right side of the domain
+        x_intervals.append([0, x_max_wrapped])
+        x_intervals.append([x_min_wrapped, 100])
+   
+    # Controll y_interval
+    y_intervals = []
+    if y_min_wrapped < y_max_wrapped:
+        # no wrapping needed 
+        y_intervals.append([y_min_wrapped, y_max_wrapped])
+    else:
+        # Extract intervals from the left and right side of the domain
+        y_intervals.append([y_min_wrapped, 100])
+        y_intervals.append([0, y_max_wrapped])
+
+    print(f"x_intervals = {x_intervals}, length = {len(x_intervals)}")
+    print(f"x_intervals = {y_intervals}, length = {len(y_intervals)}")
+
+    if len(x_intervals) == 1: 
+        if len(y_intervals) == 1: 
+            # everything is alright
+            extracted_grid = extract_region(phi, x_min_wrapped, x_max_wrapped, y_min_wrapped, y_max_wrapped)
+        elif len(y_intervals) == 2: 
+            # concatenate vertically
+            extracted_grid = concatenate_grids(
+                                extract_region(phi, x_min_wrapped, x_max_wrapped, y_intervals[0][0], y_intervals[0][1]),
+                                extract_region(phi, x_min_wrapped, x_max_wrapped, y_intervals[1][0], y_intervals[1][1])
+                                )
+    elif len(x_intervals) == 2:
+        if len(y_intervals) == 1: 
+            # concatenate horizontally
+            extracted_grid = concatenate_grids(
+                                extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_min_wrapped, y_max_wrapped),
+                                extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_min_wrapped, y_max_wrapped)
+                                )
+        elif len(y_intervals) == 2:
+            # we have to concatenate 4 grids :-( 
+            grid_left = concatenate_grids(
+                                extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_intervals[0][0], y_intervals[0][1]),
+                                extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_intervals[1][0], y_intervals[1][1])
+                                )
+            grid_right = concatenate_grids(
+                                extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_intervals[0][0], y_intervals[0][1]),
+                                extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_intervals[1][0], y_intervals[1][1])
+                                )
+            extracted_grid = concatenate_grids(grid_left, grid_right)
+
+    return extracted_grid, VN.vtk_to_numpy(extracted_grid.GetPointData().GetArray("phi"))
+ 
+def extract_region(phi, x_min, x_max, y_min, y_max):
+    """
+    Extracts a subregion of the grid `phi` based on the given bounds.
+
+    Args:
+        phi (vtkUnstructuredGrid): The input grid.
+        x_min, x_max (float): Bounds in the x-direction. Must be in [0,100]. 
+        y_min, y_max (float): Bounds in the y-direction. Must be in [0,100]. 
+
+    Returns:
+        vtkUnstructuredGrid: The extracted region.
+    """
+    # Define a box to extract a subregion
+    box = vtk.vtkBox()
+    box.SetBounds(x_min, x_max, y_min, y_max, -vtk.VTK_FLOAT_MAX, vtk.VTK_FLOAT_MAX)
+
+    # Set up the extractor
+    extractor = vtk.vtkExtractGeometry()
+    extractor.SetInputData(phi)
+    extractor.SetImplicitFunction(box)
+    extractor.ExtractInsideOn()
+    extractor.Update()
+
+    # Return the extracted region
+    return extractor.GetOutput()
+
+def concatenate_grids(grid_1, grid_2):
+    """
+    Concatenates two VTK grids horizontally (along the x-axis).
+
+    Args:
+        grid_1 (vtkUnstructuredGrid): The left grid to concatenate.
+        grid_2 (vtkUnstructuredGrid): The right grid to concatenate.
+
+    Returns:
+        vtkUnstructuredGrid: A single grid containing the horizontally concatenated data.
+    """
+    append_filter = vtk.vtkAppendFilter()
+    append_filter.AddInputData(grid_1)
+    append_filter.AddInputData(grid_2)
+    append_filter.Update()
+
+    combined_grid = vtk.vtkUnstructuredGrid()
+    combined_grid.DeepCopy(append_filter.GetOutput())
+
+    return combined_grid 
+
+
+
 def read_fine_grid(path_grid_file):
     """
     Reads the coordinates of a grid from a VTK file.
@@ -254,6 +436,8 @@ def all_my_distances(base_file,N,N_Cell,file_grids,value=0.2):
     Example:
         fine_grid = all_my_distances(base_file, 100, 10, "fine_grid.vtu", 0.2)
     """
+    
+    # TODO: fix following 3 lines 
     coords_grid = read_fine_grid(file_grids)
     fine_grid_new = read_vtu(file_grids)
     recalculate_indices(N,coords_grid)
@@ -269,16 +453,34 @@ def all_my_distances(base_file,N,N_Cell,file_grids,value=0.2):
     
     for i in range(N_Cell):
         print("resample loop ",i)
-        filename = os.path.join(base_file, "phasedata", f"phase_p{i}_20.000.vtu")
-        phi_grid=resample_phi_on_fine_grid(filename,file_grids)
-        ud_i=calculate_unsigned_dist(N,phi_grid,value)
-        fine_grid_new=append_np_array(fine_grid_new,ud_i,"ud_"+str(i))
+        neighbor_ind = compute_neighbor_indices(i) 
+        small_grid = os.path.join(Fine_grids_path, f"triangular_mesh_{i}.vtu")
 
-    write_vtu(fine_grid_new, Write_path)
+        for j in neighbor_ind:
+            filename = os.path.join(base_file, "phasedata", f"phase_p{j}_20.000.vtu")
+            phi_grid=resample_phi_on_fine_grid(filename,small_grid, j)
+            ud_i=calculate_unsigned_dist(40,phi_grid,value)
+            small_grid=append_np_array(small_grid,ud_i,"ud_"+str(i))
+            write_vtu(small_grid, Write_path)
+    
+    # TODO: adapt all_my_vertices so it can deal with 100 small grid files
+    # all_my_vertices(fine_grid_new,N_Cell)
+    
 
-    all_my_vertices(fine_grid_new,N_Cell)
+def compute_neighbor_indices(i):
+    """
+    Computes all cell indices that must be featured in the grid of cell i. i itself is included.  
+    """
+    res = [] 
+    my_midpoint = all_midpoints[i] 
+    for j in range(N_Cell):
+        test_midpoint = all_midpoints[j] 
+        if np.linalg.norm(test_midpoint - my_midpoint) <= 20.0:
+            res.append(j)
+    return res 
 
-    return fine_grid_new
+
+
 
 def discretize_to_big_file_ind(all_midpoints):
     res = np.zeros((N_Cell,2),dtype=int)
@@ -758,8 +960,8 @@ def main():
     N = 1000
     all_my_midpoints(Base_path,N_Cell)
     print(all_midpoints)
-    #  TODO: go on 
-    all_my_distances(Base_path,N,N_Cell,Grid_path,eps)
+    # TODO: go on 
+    all_my_distances(Base_path,N,N_Cell,Grid_path_1000,eps)
 
     # c,d_a=calculateInnerContour(filename1)
     # print("c",c)
@@ -783,4 +985,9 @@ def build():
 
 global N_Cell  
 N_Cell = 5 
-main()
+all_my_midpoints(Base_path, N_Cell)
+res = resample_phi_on_fine_grid(
+                          os.path.join(Base_path, "phasedata", f"phase_p{2}_20.000.vtu"), 
+                          os.path.join(Fine_grids_path, f"triangular_mesh_{2}.vtu"),
+                          2
+                          )
