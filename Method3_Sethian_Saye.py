@@ -158,7 +158,7 @@ def time_it(func):
 #!!!FRAME TIME IS HARDCODED
 def all_my_midpoints(base_file,N_Cell):
     """
-    Computes and stores the midpoints of cells at a specific time frame in a global variable.
+    Reads and stores the midpoints of cells at a specific time frame in a global variable.
 
     This function iterates over a series of cell data files, extracts the positions (`x0`, `x1`) 
     at time `t=20` for each cell, and stores these midpoints in the global variable `all_midpoints`.
@@ -171,9 +171,6 @@ def all_my_midpoints(base_file,N_Cell):
         - Creates or updates the global variable `all_midpoints`, 
           which is a 2D numpy array of shape `(N_Cell, 2)`. 
           Each row corresponds to the midpoint of a cell.
-
-    Returns:
-        None
 
     Notes:
         - The function assumes the cell data CSV files have columns `time`, `x0`, and `x1`.
@@ -233,6 +230,7 @@ def read_fine_grid(path_grid_file):
     print("coords_grid.shape = ", coords_grid.shape)
     return coords_grid
 
+@time_it
 def all_my_distances(base_file,N,N_Cell,file_grids,value=0.2):
     """
     Computes and appends the unsigned distance field for multiple phases to a fine grid.
@@ -260,6 +258,15 @@ def all_my_distances(base_file,N,N_Cell,file_grids,value=0.2):
     fine_grid_new = read_vtu(file_grids)
     recalculate_indices(N,coords_grid)
     
+    """
+    THE NEW PLAN IS TO: 
+        * call resample_phi_on_fine_grid with a 40x40 small fine grid as second argument 
+        * we need to do either ... or ...:
+            - use coordinates from big grid on small grid somehow st. the small grid doesnt start at (0,0) but at midpoint - (20,20)
+            - change the coords obtained from big grid to: coords -> coords - midpoint + (20,20)
+        * in that small grid should all cells j != i be saved that have norm(midpoint[i] - midpoint[j]) <= 20.0 (which is also old value for considering neighbors)
+    """ 
+    
     for i in range(N_Cell):
         print("resample loop ",i)
         filename = os.path.join(base_file, "phasedata", f"phase_p{i}_20.000.vtu")
@@ -270,81 +277,8 @@ def all_my_distances(base_file,N,N_Cell,file_grids,value=0.2):
     write_vtu(fine_grid_new, Write_path)
 
     all_my_vertices(fine_grid_new,N_Cell)
+
     return fine_grid_new
-
-def all_my_distances_small(base_file,N,N_Cell,fine_grid_new,value=0.2):
-    """ TODO: 
-    Takes the big input file coords_grid of length 100x100, iterates i = range(NCell) and 
-    creates, with each iteration representing one cell, a grid of size 40x40 that is a subdomain
-    of coords_grid and stores all information of the subdomain with area 40x40 and midpoint = all_midpoints[i] 
-    in a new grid file fine_mesh_{i}.vtu. 
-
-    Computes and appends the unsigned distance field for multiple phases to a fine grid.
-
-    This function processes multiple phase data files (`phase_p{i}_20.000.vtu`), resamples 
-    the `phi` values onto a fine grid, calculates the unsigned distance for each phase using a 
-    threshold value, and appends the results to the fine grid. The modified fine grid is then written 
-    to an output file, and additional vertex information is computed.
-    
-    Side effects:
-        creates global variables:
-            - `indices_phi`: A vector of length NCell with each element being a 
-            2D array mapping grid positions to point indices.
-            - `ind_phi_x`: A vector of length NCell with each element being a 
-            1D array storing the x-coordinates of the grid points.
-            - `ind_phi_y`: A vector of length NCell with each element being a
-            1D array storing the y-coordinates of the grid points.
-            - `dx`: The grid spacing computed as the upper bound divided by `N`.
-
-    Args:
-        base_file (str): Path to the directory containing the phase data files.
-        N (int): The resolution of the new finer grid.
-        N_Cell (int): The total number of phases/cells to process.
-        file_grid (str): Path to the fine grid file.
-        value (float, optional): The threshold value for calculating the unsigned distance field. 
-                                 Default is 0.2.
-
-    Returns:
-        vtk.vtkPolyData: The modified fine grid with the appended unsigned distance fields.
-
-    Example:
-        fine_grid = all_my_distances(base_file, 100, 10, "fine_grid.vtu", 0.2)
-    """
-    
-
-    global indices_phi,ind_phi_x,ind_phi_y,dx
-    indices_phi = [np.zeros((40, 40), dtype=int) for _ in range(N_Cell)]    # for each phase (N_Cell phases)
-                                                 # elemens are: indicis_phi[cell][] = 
-    ind_phi_x = [np.zeros(40 * 40, dtype=int) for _ in range(N_Cell)]      # flattened x-coordinates
-    ind_phi_y = [np.zeros(40 * 40, dtype=int) for _ in range(N_Cell)]      # flattened y-coordinates
-    # dx is global, initialized before processing
-    dx = 100.0 / 1000  # Assuming N=1000
-    # maybe we need path to harish1000x1000 grif file instead 
-    coords_grid = read_fine_grid(base_file)
-    int_all_midpoints = discretize_to_big_file_ind(all_midpoints)
-
-    for ind_big_file in range(coords_grid.shape[0]): 
-
-        x_coord=round(coords_grid[ind_big_file,0]/dx)
-        y_coord=round(coords_grid[ind_big_file,1]/dx)
-    
-        for i in range(N_Cell):
-            if is_point_in_subdomain([x_coord, y_coord], int_all_midpoints[i]):
-                append_point_insubdomain(i)
-
-
-
-        recalculate_indices_small(N,coords_grid,i)
-        print("resample loop ",i)
-        filename = os.path.join(base_file, "phasedata", f"phase_p{i}_20.000.vtu")
-        phi_grid=resample_phi_on_fine_grid(filename,file_grids)
-        ud_i=calculate_unsigned_dist(N,phi_grid,value)
-        fine_grid_new=append_np_array(fine_grid_new,ud_i,"ud_"+str(i))
-
-    write_vtu(fine_grid_new, Write_path)
-    all_my_vertices(fine_grid_new,N_Cell)
-    return fine_grid_new
-
 
 def discretize_to_big_file_ind(all_midpoints):
     res = np.zeros((N_Cell,2),dtype=int)
@@ -355,12 +289,6 @@ def discretize_to_big_file_ind(all_midpoints):
 def is_point_in_subdomain(point, subdomain_center)->bool:
     return  (subdomain_center[0]-200 <= point[0] <= subdomain_center[0]+200 and \
              subdomain_center[1]-200 <= point[1] <= subdomain_center[1]+200      )
-
-    
-
-
-
-
 
 def recalculate_indices(N,coords_grid):
     """
@@ -402,68 +330,6 @@ def recalculate_indices(N,coords_grid):
         ind_phi_y[i]=y_coord
         if 0 <= i <= 1000: 
             print(f"coordinates of {i}th point = ({x_coord}, {y_coord})")
-
-def recalculate_indices_small(N, coords_grid, i):
-    """
-    Calculates and stores the indices mapping each point in a grid to its 
-    corresponding position in a 2D index array. It also stores the x and y coordinates 
-    of each grid point in separate 1D arrays.
-
-    Args:
-        N (int): The number of grid divisions (grid resolution).
-        coords_grid (np.ndarray): This array holds all coordinates from the big grid. 
-                                  A 2D NumPy array of shape (M, 2) containing the 
-                                  coordinates of grid points, where M is the number 
-                                  of points in the grid. 
-        
-
-    Side Effects:
-        - Updates global arrays:
-            - `indices_phi`: A 2D array mapping grid positions to point indices.
-            - `ind_phi_x`: A 1D array storing the x-coordinates of the grid points.
-            - `ind_phi_y`: A 1D array storing the y-coordinates of the grid points.
-            - `dx`: The grid spacing computed as the upper bound divided by `N`.
-
-    Example:
-        recalculate_indices(100, coords_grid)
-        # Updates global variables with recalculated indices and coordinates.
-    """
-    
-    UpperBound=100.0
-    dx=UpperBound/N
-    small_grid_size = 40
-    float_center = all_midpoints[i] # thats the float 2d mid point of considered cell i
-    center = [round(float_center[0]/dx), round(float_center[1]/dx)] # thats its coordinates in old big file
-
-    indSmallFile = 0 
-    for small_x in range(center[0]-20, center[0]+21):
-        for small_y in range(center[1]-20, center[1]+21):
-            # {(small_x, small_y)} is the set of all points of our subdomain of interest 
-            # TODO: check if this works 
-            # assumption: the grid is stored row major like 
-            # k = 1001 * small_x + 
-           
-            # make sure they are in (0,1000)^2 
-            if small_x < 0:
-                small_x += 1000
-            elif small_x > 1000:
-                small_x -= 1000
-            if small_y < 0:
-                small_y += 1000
-            elif small_y > 1000:
-                small_y -= 1000
-            
-            indBigFile = 1001*small_x + small_y 
-
-            x_coord=round(coords_grid[indBigFile,0]/dx)
-            y_coord=round(coords_grid[indBigFile,1]/dx)
-            indices_phi[i][x_coord, y_coord] = indSmallFile
-            ind_phi_x[i][indSmallFile] = x_coord
-            ind_phi_y[i][indSmallFile] = y_coord
-
-            indSmallFile += 1
-        # WE HAVE TO SET:  indices_phi[i], ind_phi_x[i], ind_phi_y[i]
-    #print("i'm leaving")
 
 def calculate_unsigned_dist(N,phi,value):
     """
@@ -681,20 +547,6 @@ def create_and_save_uniform_triangular_grids(grid_length, output_path, N_Cells, 
         print(f"An error occurred: {e}")
         return False
 
-#----------------Helper Functions----------------- 
-#  (assumes existence of read_vtu and write_vtu)
-def read_vtu(file_path):
-    reader = vtk.vtkXMLUnstructuredGridReader()
-    reader.SetFileName(file_path)
-    reader.Update()
-    return reader
-
-def write_vtu(grid, file_path):
-    writer = vtk.vtkXMLUnstructuredGridWriter()
-    writer.SetFileName(file_path)
-    writer.SetInputData(grid)
-    writer.Write()
-
 def read_vtu_length(path):
     """
     Reads a `.vtu` file and calculates the length of the grid.
@@ -723,8 +575,141 @@ def read_vtu_length(path):
         print(f"Error reading VTU length: {e}")
         return None
 
-#-------------------------------------------------
+#---------------small functions-----------------
+def recalculate_indices_small(N, coords_grid, i):
+    """
+    Calculates and stores the indices mapping each point in a grid to its 
+    corresponding position in a 2D index array. It also stores the x and y coordinates 
+    of each grid point in separate 1D arrays.
 
+    Args:
+        N (int): The number of grid divisions (grid resolution).
+        coords_grid (np.ndarray): This array holds all coordinates from the big grid. 
+                                  A 2D NumPy array of shape (M, 2) containing the 
+                                  coordinates of grid points, where M is the number 
+                                  of points in the grid. 
+        
+
+    Side Effects:
+        - Updates global arrays:
+            - `indices_phi`: A 2D array mapping grid positions to point indices.
+            - `ind_phi_x`: A 1D array storing the x-coordinates of the grid points.
+            - `ind_phi_y`: A 1D array storing the y-coordinates of the grid points.
+            - `dx`: The grid spacing computed as the upper bound divided by `N`.
+
+    Example:
+        recalculate_indices(100, coords_grid)
+        # Updates global variables with recalculated indices and coordinates.
+    """
+    
+    UpperBound=100.0
+    dx=UpperBound/N
+    small_grid_size = 40
+    float_center = all_midpoints[i] # thats the float 2d mid point of considered cell i
+    center = [round(float_center[0]/dx), round(float_center[1]/dx)] # thats its coordinates in old big file
+
+    indSmallFile = 0 
+    for small_x in range(center[0]-20, center[0]+21):
+        for small_y in range(center[1]-20, center[1]+21):
+            # {(small_x, small_y)} is the set of all points of our subdomain of interest 
+            # TODO: check if this works 
+            # assumption: the grid is stored row major like 
+            # k = 1001 * small_x + 
+           
+            # make sure they are in (0,1000)^2 
+            if small_x < 0:
+                small_x += 1000
+            elif small_x > 1000:
+                small_x -= 1000
+            if small_y < 0:
+                small_y += 1000
+            elif small_y > 1000:
+                small_y -= 1000
+            
+            indBigFile = 1001*small_x + small_y 
+
+            x_coord=round(coords_grid[indBigFile,0]/dx)
+            y_coord=round(coords_grid[indBigFile,1]/dx)
+            indices_phi[i][x_coord, y_coord] = indSmallFile
+            ind_phi_x[i][indSmallFile] = x_coord
+            ind_phi_y[i][indSmallFile] = y_coord
+
+            indSmallFile += 1
+        # WE HAVE TO SET:  indices_phi[i], ind_phi_x[i], ind_phi_y[i]
+    #print("i'm leaving")
+
+def all_my_distances_small(base_file,N,N_Cell,fine_grid_new,value=0.2):
+    """ TODO: 
+    Takes the big input file coords_grid of length 100x100, iterates i = range(NCell) and 
+    creates, with each iteration representing one cell, a grid of size 40x40 that is a subdomain
+    of coords_grid and stores all information of the subdomain with area 40x40 and midpoint = all_midpoints[i] 
+    in a new grid file fine_mesh_{i}.vtu. 
+
+    Computes and appends the unsigned distance field for multiple phases to a fine grid.
+
+    This function processes multiple phase data files (`phase_p{i}_20.000.vtu`), resamples 
+    the `phi` values onto a fine grid, calculates the unsigned distance for each phase using a 
+    threshold value, and appends the results to the fine grid. The modified fine grid is then written 
+    to an output file, and additional vertex information is computed.
+    
+    Side effects:
+        creates global variables:
+            - `indices_phi`: A vector of length NCell with each element being a 
+            2D array mapping grid positions to point indices.
+            - `ind_phi_x`: A vector of length NCell with each element being a 
+            1D array storing the x-coordinates of the grid points.
+            - `ind_phi_y`: A vector of length NCell with each element being a
+            1D array storing the y-coordinates of the grid points.
+            - `dx`: The grid spacing computed as the upper bound divided by `N`.
+
+    Args:
+        base_file (str): Path to the directory containing the phase data files.
+        N (int): The resolution of the new finer grid.
+        N_Cell (int): The total number of phases/cells to process.
+        file_grid (str): Path to the fine grid file.
+        value (float, optional): The threshold value for calculating the unsigned distance field. 
+                                 Default is 0.2.
+
+    Returns:
+        vtk.vtkPolyData: The modified fine grid with the appended unsigned distance fields.
+
+    Example:
+        fine_grid = all_my_distances(base_file, 100, 10, "fine_grid.vtu", 0.2)
+    """
+    
+
+    global indices_phi,ind_phi_x,ind_phi_y,dx
+    indices_phi = [np.zeros((40, 40), dtype=int) for _ in range(N_Cell)]    # for each phase (N_Cell phases)
+                                                 # elemens are: indicis_phi[cell][] = 
+    ind_phi_x = [np.zeros(40 * 40, dtype=int) for _ in range(N_Cell)]      # flattened x-coordinates
+    ind_phi_y = [np.zeros(40 * 40, dtype=int) for _ in range(N_Cell)]      # flattened y-coordinates
+    # dx is global, initialized before processing
+    dx = 100.0 / 1000  # Assuming N=1000
+    # maybe we need path to harish1000x1000 grif file instead 
+    coords_grid = read_fine_grid(base_file)
+    int_all_midpoints = discretize_to_big_file_ind(all_midpoints)
+
+    for ind_big_file in range(coords_grid.shape[0]): 
+
+        x_coord=round(coords_grid[ind_big_file,0]/dx)
+        y_coord=round(coords_grid[ind_big_file,1]/dx)
+    
+        for i in range(N_Cell):
+            if is_point_in_subdomain([x_coord, y_coord], int_all_midpoints[i]):
+                append_point_insubdomain(i)
+
+
+
+        recalculate_indices_small(N,coords_grid,i)
+        print("resample loop ",i)
+        filename = os.path.join(base_file, "phasedata", f"phase_p{i}_20.000.vtu")
+        phi_grid=resample_phi_on_fine_grid(filename,file_grids)
+        ud_i=calculate_unsigned_dist(N,phi_grid,value)
+        fine_grid_new=append_np_array(fine_grid_new,ud_i,"ud_"+str(i))
+
+    write_vtu(fine_grid_new, Write_path)
+    all_my_vertices(fine_grid_new,N_Cell)
+    return fine_grid_new
 
  
 # THIS FILE CONTAINS MULTIPLE HARDCODED THINGS WHICH MIGHT BE BENEFICIAL TO REMOVE
