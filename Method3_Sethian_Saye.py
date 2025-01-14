@@ -217,7 +217,7 @@ def resample_phi_on_fine_grid(path_phi, path_fine_grid, i):
         midpoint_selected[1] - 20, midpoint_selected[1] + 20
     ]
 
-    extracted_grid, extracted_phi = extract_phi(phi, midpoint_selected[0]-20, midpoint_selected[0]+20, midpoint_selected[1]-20, midpoint_selected[1]+20)
+    extracted_grid, extracted_phi = extract_phi(phi, midpoint_selected[0]-20, midpoint_selected[0]+20, midpoint_selected[1]-20, midpoint_selected[1]+20, midpoint_selected)
     bounds = extracted_grid.GetBounds()  # Returns (xmin, xmax, ymin, ymax, zmin, zmax)
 
     # Print the bounds
@@ -263,7 +263,8 @@ def resample_phi_on_fine_grid(path_phi, path_fine_grid, i):
     return res 
     """
 
-def extract_phi(phi, x_min, x_max, y_min, y_max, Lx=100, Ly=100):
+# TODO: control if that works!
+def extract_phi(phi, x_min, x_max, y_min, y_max, midpoint):
     """
     Extracts the scalar field `phi` from a given grid, considering periodic boundary conditions.
     
@@ -302,8 +303,8 @@ def extract_phi(phi, x_min, x_max, y_min, y_max, Lx=100, Ly=100):
         x_intervals.append([x_min_wrapped, x_max_wrapped])
     else:
         # Extract intervals from the left and right side of the domain
-        x_intervals.append([0, x_max_wrapped])
         x_intervals.append([x_min_wrapped, 100])
+        x_intervals.append([0, x_max_wrapped])
    
     # Controll y_interval
     y_intervals = []
@@ -324,31 +325,72 @@ def extract_phi(phi, x_min, x_max, y_min, y_max, Lx=100, Ly=100):
             extracted_grid = extract_region(phi, x_min_wrapped, x_max_wrapped, y_min_wrapped, y_max_wrapped)
         elif len(y_intervals) == 2: 
             # concatenate vertically
-            extracted_grid = concatenate_grids(
-                                extract_region(phi, x_min_wrapped, x_max_wrapped, y_intervals[0][0], y_intervals[0][1]),
-                                extract_region(phi, x_min_wrapped, x_max_wrapped, y_intervals[1][0], y_intervals[1][1])
-                                )
+            upper_grid = extract_region(phi, x_min_wrapped, x_max_wrapped, y_intervals[0][0], y_intervals[0][1]) 
+            lower_grid = extract_region(phi, x_min_wrapped, x_max_wrapped, y_intervals[1][0], y_intervals[1][1]) 
+            # move upper grid under the lower grid 
+            upper_grid = shift_grid_vtk(upper_grid, dy=-100)
+            extracted_grid = concatenate_grids(lower_grid, upper_grid) 
+                                 
+                                
     elif len(x_intervals) == 2:
         if len(y_intervals) == 1: 
             # concatenate horizontally
-            extracted_grid = concatenate_grids(
-                                extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_min_wrapped, y_max_wrapped),
-                                extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_min_wrapped, y_max_wrapped)
-                                )
+            right_grid = extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_min_wrapped, y_max_wrapped)
+            left_grid = extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_min_wrapped, y_max_wrapped)
+            # move right grid next to the left grid 
+            right_grid = shift_grid_vtk(right_grid, dx=-100)
+            extracted_grid = concatenate_grids(right_grid, left_grid) 
+
         elif len(y_intervals) == 2:
             # we have to concatenate 4 grids :-( 
-            grid_left = concatenate_grids(
-                                extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_intervals[0][0], y_intervals[0][1]),
-                                extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_intervals[1][0], y_intervals[1][1])
-                                )
-            grid_right = concatenate_grids(
-                                extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_intervals[0][0], y_intervals[0][1]),
-                                extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_intervals[1][0], y_intervals[1][1])
-                                )
-            extracted_grid = concatenate_grids(grid_left, grid_right)
+        	
+            # left part: 
+            grid_left_upper = extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_intervals[0][0], y_intervals[0][1]) 
+            grid_left_lower = extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_intervals[1][0], y_intervals[1][1])
+            # move upper grid under the lower grid 
+            grid_left_upper = shift_grid_vtk(grid_left_upper, dy=-100)
+            left_extracted_grid = concatenate_grids(grid_left_upper, grid_left_lower)  
 
+            # right part: 
+            grid_right_upper = extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_intervals[0][0], y_intervals[0][1]) 
+            grid_right_lower = extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_intervals[1][0], y_intervals[1][1])
+            # move upper grid under the lower grid 
+            grid_right_upper = shift_grid_vtk(grid_right_upper, dy=-100)
+            right_extracted_grid = concatenate_grids(grid_right_lower, grid_right_upper) 
+
+            # move right grid next to the left grid 
+            right_extracted_grid = shift_grid_vtk(right_extracted_grid, dx=-100)
+            extracted_grid = concatenate_grids(right_extracted_grid, left_extracted_grid) 
+
+    # shift it so that midpoint -> 20,20 
+    extracted_grid = shift_grid_vtk(extracted_grid, dx = 20 - midpoint[0], dy = 20 - midpoint[1])
     return extracted_grid, VN.vtk_to_numpy(extracted_grid.GetPointData().GetArray("phi"))
- 
+
+def shift_grid_vtk(grid, dx=0.0, dy=0.0, dz=0.0):
+    """
+    Shifts the coordinates of all points in a VTK grid using vtkTransform.
+
+    Args:
+        grid (vtkUnstructuredGrid): The input grid to shift.
+        dx, dy, dz (float): The amount to shift in each direction.
+
+    Returns:
+        vtkUnstructuredGrid: The shifted grid.
+    """
+    # Create a transformation
+    transform = vtk.vtkTransform()
+    transform.Translate(dx, dy, dz)
+
+    # Apply the transformation to the grid
+    transform_filter = vtk.vtkTransformFilter()
+    transform_filter.SetInputData(grid)
+    transform_filter.SetTransform(transform)
+    transform_filter.Update()
+
+    # Return the transformed grid
+    return transform_filter.GetOutput()
+
+
 def extract_region(phi, x_min, x_max, y_min, y_max):
     """
     Extracts a subregion of the grid `phi` based on the given bounds.
@@ -991,3 +1033,4 @@ res = resample_phi_on_fine_grid(
                           os.path.join(Fine_grids_path, f"triangular_mesh_{2}.vtu"),
                           2
                           )
+print(type(res))
