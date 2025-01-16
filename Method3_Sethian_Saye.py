@@ -20,14 +20,21 @@ Code_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code")
 VTK_path = os.path.join(Code_path, "vtk-suite")
 sys.path.append(VTK_path)
 
-# path for input file 
-Base_path = os.path.join(Code_path, "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1")
-
 # Path to Output directory 
 Output_path = os.path.join(Code_path, "output")
 
 # path to fine grid directory 
-Small_fine_grid_path = os.path.join(Code_path, "small_fine_grid_template.vtu")
+Fine_grid_200x200_path = os.path.join(Code_path, "small_fine_grid_template_200x200.vtu")
+
+# path to fine grid directory 
+Fine_grid_600x600_path = os.path.join(Code_path, "small_fine_grid_template_600x600.vtu")
+
+# path for input file 
+Base_path = os.path.join(Code_path, "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1")
+
+# path to uncleaned vertices directory 
+Vertices_Path = os.path.join(Base_path, "vertices_not_cleaned_NEW")
+
 
 import numpy as np
 import vtk
@@ -41,7 +48,7 @@ from vtk.util import numpy_support as VN
 from vtk.util.numpy_support import numpy_to_vtk
 
 import skfmm
-from vtk_append_data import append_np_array
+from vtk_append_data import append_np_array 
 from collections import defaultdict
 from copy import deepcopy
 import time
@@ -442,14 +449,13 @@ def all_my_distances(N_small_resolution,N_Cell,value=0.2):
     """
     
     # assume that just works maybe change N -> N +/- 1 
-    coordinates_small_grid = read_fine_grid(Small_fine_grid_path)
+    coordinates_small_grid = read_fine_grid(Fine_grid_200x200_path)
     recalculate_indices(N_small_resolution,coordinates_small_grid)
-    small_grid_path = os.path.join(Code_path, f"small_fine_grid_template.vtu")
     
     for i in range(N_Cell):
         
         print("resample loop ",i)
-        small_grid_i = read_vtu(small_grid_path)
+        small_grid_i = read_vtu(Fine_grid_200x200_path)
         phasefield_path = os.path.join(Base_path, "phasedata", f"phase_p{i}_20.000.vtu")
         phi_grid = extract_to_smaller_file(phasefield_path, small_grid_i, i, N_small_resolution)
         ud_i = calculate_unsigned_dist(40, phi_grid, value)
@@ -457,9 +463,10 @@ def all_my_distances(N_small_resolution,N_Cell,value=0.2):
         write_path_i = os.path.join(Output_path, f"fine_mesh_{i}_distance.vtu")
         write_vtu(small_grid_i, write_path_i)
 
+    # Now all distances are computed and saved to all the small fine meshes. We want to transfer all to one big fine grid 
 
     # TODO: adapt all_my_vertices so it can deal with 100 small grid files
-    # all_my_vertices(fine_grid_new,N_Cell)
+    all_my_vertices(N_Cell)
     
 def compute_neighbor_indices(i):
     """
@@ -555,7 +562,7 @@ def adjust_point(ref,test_h,grid_length):
             test[1] -= grid_length
     return test
 
-def all_my_vertices(fine_grid,N_Cells,r=20.0):
+def all_my_vertices(N_Cells,r=20.0):
     """
     Collects and saves the vertices of common boundaries between neighboring cells based on midpoints.
 
@@ -573,24 +580,75 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
     Side Effects:
         - Saves `.npy` files for each cell's boundary vertices in the directory specified by `dir_vertices`.
     """
+
+    # we need to be able to map the coords to the midpoint in the original grid 
+
     all_vertices_collected=defaultdict(list)
-    #Later on:Double loop
+
     for i in range(N_Cells):
-    #NOW: get all the indices for which the midpoints are close
+        
+        print(f"loop {i} in all_my_vertices")
+        
         possible_neighs=[]
         my_midpoint_i=all_midpoints[i,:]
-        # TODO: do k>i here!!!
-        for k in range(i+1, N_Cells):
-        #for k in range(N_Cells):
-            print(f"i = {i}, k = {k}")
-            
-            other_midpoint=all_midpoints[k,:]
+        for j in range(i+1, N_Cells):
+            other_midpoint=all_midpoints[j,:]
             other_midpoint=adjust_point(my_midpoint_i,other_midpoint,100.0)
             if (np.linalg.norm(my_midpoint_i-other_midpoint)<r):
-                possible_neighs.append(k)
-            
+                possible_neighs.append(j)
+     
+        
+        # now create operating grid 
+        neighborhood_grid = read_vtu(Fine_grid_600x600_path).GetOutput()
+        neighborhood_grid = shift_grid_vtk(
+                                           neighborhood_grid, 
+                                           dx = all_midpoints[i][0] - 30, 
+                                           dy = all_midpoints[i][1] - 30
+                                           )
+
+        small_fine_grid_i_path = os.path.join(Output_path, f"fine_mesh_{i}_distance.vtu")
+        fine_grid_i = read_vtu(small_fine_grid_i_path).GetOutput()
+        # move it such that: midpoint_grid -> midpoint[i]; midpoint_grid = (10, 10)
+        fine_grid_i = shift_grid_vtk(
+                                     fine_grid_i, 
+                                     dx=all_midpoints[i][0] - 10, 
+                                     dy=all_midpoints[i][1] - 10
+                                     )
+
+        # append it here 
+        probe_filter  = vtk.vtkProbeFilter()
+        probe_filter.SetSourceData(fine_grid_i)  # The grid with `ud_i`
+        probe_filter.SetInputData(neighborhood_grid)        # The grid to map onto
+        probe_filter.Update()
+
+        write_vtu(probe_filter.GetOutput(), os.path.join(Output_path, "neighborhood1.vtu"))
+        '''
+        print(f"now collecting all cells that are near midpoint[{i}]")
         for j in possible_neighs:
-            print("current j is ",j)
+            # this excludes i 
+            print(f"neighbor {j}")
+
+            """
+            small_fine_grid_j_path = os.path.join(Output_path, f"fine_mesh_{j}_distance.vtu")
+            fine_grid_j = read_vtu(small_fine_grid_j_path).GetOutput()
+            # move it such that: midpoint_grid -> midpoint[i]; midpoint_grid = (10, 10)
+            dx = all_midpoints[j][0] - 10
+            dy = all_midpoints[j][1] - 10
+            fine_grid_j = shift_grid_vtk(fine_grid_j, dx=dx, dy=dy)
+            """
+            
+            small_fine_grid_j_path = os.path.join(Output_path, f"fine_mesh_{j}_distance.vtu")
+            fine_grid_j = read_vtu(small_fine_grid_j_path).GetOutput()
+            # move it such that: midpoint_grid -> midpoint[j]; midpoint_grid = (10, 10)
+            fine_grid_j = shift_grid_vtk(
+                                     fine_grid_j, 
+                                     dx=all_midpoints[j][0] - 10, 
+                                     dy=all_midpoints[j][1] - 10
+                                     )
+            
+            
+
+            # compute diff between i and j 
             calculator = vtk.vtkArrayCalculator()
             calculator.SetInputData(fine_grid.GetOutput())
             calculator.AddScalarVariable("i","ud_"+str(i), 0)
@@ -599,20 +657,26 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
             calculator.SetResultArrayName("diff")
             calculator.Update()
             calculator.GetOutput().GetPointData().SetActiveScalars("diff")
+
+            # compute where diff is 0 (THESE POINTS ARE POSSIBLE VERTICES)
             contour = vtk.vtkContourFilter()
             contour.SetInputConnection(calculator.GetOutputPort())
             contour.SetValue(0,0)
             contour.Update()
             n_points = contour.GetOutput().GetNumberOfPoints()
+
+            # collect the coordinates of these points
             coords = np.zeros((n_points,2))
-            array_all=np.zeros((N_Cells,n_points))
+            array_all = np.zeros((N_Cells,n_points))
+            
             for k in range(n_points):
-                coords[k,0],coords[k,1],dummy_argument= contour.GetOutput().GetPoint(k)
+                coords[k,0], coords[k,1], _ = contour.GetOutput().GetPoint(k)
+
             for k in range(N_Cells):
                 array_all[k,:]=VN.vtk_to_numpy(contour.GetOutput().GetPointData().GetArray("ud_"+str(k)))
+
             array_all=array_all -array_all[i,:][None,:]
             indices=np.where(array_all.max(axis=0)<=0.0)[0]
-            print("i ", i ,"j ",j)
             if len(indices)>0:
                 midpoint_i=all_midpoints[i,:]
                 midpoint_j=adjust_point(midpoint_i,all_midpoints[j,:],100.0)
@@ -621,18 +685,18 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
                 refvec=np.zeros(2)
                 refvec[0]=-ref_vec_h[1]
                 refvec[1]=ref_vec_h[0]
-                for k in indices:
-                    coords[k,:]=adjust_point(midpoint_i,coords[k,:],100.0)
+                for j in indices:
+                    coords[j,:]=adjust_point(midpoint_i,coords[j,:],100.0)
                 
                 coords_sorted,coords_keys=sort2d_with_key(coords[indices,:],midpoint_i,refvec)
     
                 max_diff=0
                 ind=-100
-                for k in range(len(coords_keys)):
-                    diff_curr=abs(np.arctan2(np.sin(coords_keys[k-1]-coords_keys[k]),np.cos(coords_keys[k-1]-coords_keys[k])))
+                for j in range(len(coords_keys)):
+                    diff_curr=abs(np.arctan2(np.sin(coords_keys[j-1]-coords_keys[j]),np.cos(coords_keys[j-1]-coords_keys[j])))
                     if (max_diff<diff_curr):
                         max_diff=diff_curr
-                        ind=k
+                        ind=j
                         print(ind, diff_curr)
             
                 #adjust coordinates
@@ -661,8 +725,11 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
             
             else:
                 print("no common boundary")
+
         my_points_i=np.array(all_vertices_collected[i])
-        np.save(dir_vertices+'/phase_'+str(i),my_points_i)
+        np.save(Vertices_Path+'/phase_'+str(i),my_points_i)
+    '''
+        
 
 def create_small_grid_template(grid_length, output_path, N_resolution):
     """
@@ -717,7 +784,7 @@ def create_small_grid_template(grid_length, output_path, N_resolution):
                 grid.InsertNextCell(triangle2.GetCellType(), triangle2.GetPointIds())
 
         # Save the grid to `.vtu` files
-        file_name = os.path.join(Code_path, "small_fine_grid_template.vtu")
+        file_name = os.path.join(Code_path, f"small_fine_grid_template_{N_resolution}x{N_resolution}.vtu")
         print(f"grid bounds = {grid.bounds}")
         write_vtu(grid, file_name)
         return True
@@ -726,7 +793,7 @@ def create_small_grid_template(grid_length, output_path, N_resolution):
         print(f"An error occurred: {e}")
         return False
 
- 
+
 # THIS FILE CONTAINS MULTIPLE HARDCODED THINGS WHICH MIGHT BE BENEFICIAL TO REMOVE
 # The periodicity of 100 is hardcoded
 # Filenames for tests are hardcoded
@@ -782,16 +849,19 @@ def main():
 
 #### for creating the 100 small fine grids  
 def build():
-    N_fine_resolution = 200 
-    grid_length = 20
+    N_fine_resolution = 600 
+    grid_length = 60
     print(create_small_grid_template(grid_length, Output_path, N_fine_resolution))
 
 global N_Cell  
 N_Cell = 1
 N_fine_resolution = 200 
 eps = 0.1
+
 all_my_midpoints(N_Cell)
 # TODO: go on and check how all_my_distances works now 
 all_my_distances(N_fine_resolution, N_Cell)
+
+
 
 
