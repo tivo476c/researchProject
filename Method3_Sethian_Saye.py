@@ -201,7 +201,7 @@ def all_my_midpoints(N_Cell):
         all_midpoints[i,1] = x1
     return
 
-def extract_to_smaller_file(path_phi, fine_grid, i):
+def extract_to_smaller_file(path_phi, fine_grid, i, N_small_resolution):
     """        
     Saves all phi values of the domain
 
@@ -217,11 +217,11 @@ def extract_to_smaller_file(path_phi, fine_grid, i):
     midpoint_selected = all_midpoints[i]
     print(f"selected midpoint = {midpoint_selected}")
 
-    extracted_grid, _ = extract_phi(phi, midpoint_selected, i)
-
-    if i == 5:
-        newWritePath = os.path.join(Output_path, "check5_extracted_1.vtu")
-        write_vtu(extracted_grid, newWritePath)
+    extracted_grid = extract_phi(phi, midpoint_selected, N_small_resolution)
+    
+    print(f"extracted_grid bounds = { extracted_grid.GetBounds() }")
+    write_path_i = os.path.join(Output_path, f"fine_mesh_{i}_extracted.vtu")
+    write_vtu(extracted_grid,write_path_i)
 
     # interpolate to fine grid 
     interpolator = vtk.vtkResampleWithDataSet()
@@ -230,16 +230,12 @@ def extract_to_smaller_file(path_phi, fine_grid, i):
     interpolator.Update()
     h=interpolator.GetOutput()
 
-    if i == 5:
-        newWritePath = os.path.join(Output_path, "check5_interpolated_1.vtu")
-        write_vtu(h, newWritePath)
-
-    write_path_i = os.path.join(Output_path, f"fine_mesh_{i}.vtu")
+    write_path_i = os.path.join(Output_path, f"fine_mesh_{i}_interpolated.vtu")
     write_vtu(h,write_path_i)
 
     return VN.vtk_to_numpy(h.GetPointData().GetArray("phi"))
 
-def extract_phi(phi, midpoint, i):
+def extract_phi(phi, midpoint, N_small_resolution):
     """
     Extracts the scalar field `phi` from a given grid, considering periodic boundary conditions.
     The region containing midpoint must not be shifted! Somehow the interpolator cannot handle 
@@ -257,10 +253,11 @@ def extract_phi(phi, midpoint, i):
      
     # is the problem, that the section containing the midpoint gets shifted for i=5? 
 
-    x_min = midpoint[0] - 20
-    x_max = midpoint[0] + 20
-    y_min = midpoint[1] - 20
-    y_max = midpoint[1] + 20
+    shift_index = round(N_small_resolution /20) 
+    x_min = midpoint[0] - shift_index
+    x_max = midpoint[0] + shift_index
+    y_min = midpoint[1] - shift_index
+    y_max = midpoint[1] + shift_index
         
     # Apply periodic boundary conditions to the bounds
     x_min_wrapped = x_min  % 100
@@ -275,8 +272,8 @@ def extract_phi(phi, midpoint, i):
         x_intervals.append([x_min_wrapped, x_max_wrapped])
     else:
         # Extract intervals from the left and right side of the domain
-        x_intervals.append([x_min_wrapped, 100])
-        x_intervals.append([0, x_max_wrapped])
+        x_intervals.append([x_min_wrapped, 101])
+        x_intervals.append([-1, x_max_wrapped])
    
     # Control y_interval
     y_intervals = []
@@ -285,8 +282,8 @@ def extract_phi(phi, midpoint, i):
         y_intervals.append([y_min_wrapped, y_max_wrapped])
     else:
         # Extract intervals from the left and right side of the domain
-        y_intervals.append([y_min_wrapped, 100])
-        y_intervals.append([0, y_max_wrapped])
+        y_intervals.append([y_min_wrapped, 101])
+        y_intervals.append([-1, y_max_wrapped])
 
     if len(x_intervals) == 1: 
         if len(y_intervals) == 1: 
@@ -327,7 +324,16 @@ def extract_phi(phi, midpoint, i):
             # we have to concatenate 4 grids :-( 
 
             grid_upper_left = extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_intervals[0][0], y_intervals[0][1]) 
+            
+            
+            
             grid_lower_left = extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_intervals[1][0], y_intervals[1][1])
+            
+            Write_path = os.path.join(Output_path, "lower_left_0.vtu")
+            write_vtu(grid_lower_left, Write_path)
+            
+
+
             grid_upper_right = extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_intervals[0][0], y_intervals[0][1]) 
             grid_lower_right = extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_intervals[1][0], y_intervals[1][1])
         	
@@ -373,9 +379,11 @@ def extract_phi(phi, midpoint, i):
                 # midpoint is in lower left region
                 # so we have to move right to left and upper to low 
 
+                print("wir sind hier richtig :-p")
                 # left part: 
                 # move upper grid under the lower grid 
                 grid_upper_left = shift_grid_vtk(grid_upper_left, dy=-100)
+
                 left_extracted_grid = concatenate_grids(grid_upper_left, grid_lower_left)  
     
                 # right part: 
@@ -410,9 +418,9 @@ def extract_phi(phi, midpoint, i):
                 raise ValueError("midpoint is not in the given area")
 
     # shift it so that midpoint -> 20,20 
-    extracted_grid = shift_grid_vtk(extracted_grid, dx = 20 - midpoint[0], dy = 20 - midpoint[1])
-
-    return extracted_grid, VN.vtk_to_numpy(extracted_grid.GetPointData().GetArray("phi"))
+    extracted_grid = shift_grid_vtk(extracted_grid, dx = shift_index - midpoint[0], dy = shift_index - midpoint[1])
+    
+    return extracted_grid
 
 def is_midpoint_in_region(midpoint, x_min, x_max, y_min, y_max):
     return x_min <= midpoint[0] <= x_max and y_min <= midpoint[1] <= y_max
@@ -516,7 +524,7 @@ def resample_phi_on_fine_grid(filename,filename_grid):
 
 
 @time_it
-def all_my_distances(N,N_Cell,value=0.2):
+def all_my_distances(N_small_resolution,N_Cell,value=0.2):
     """
     Computes and appends the unsigned distance field for multiple phases to a fine grid.
 
@@ -527,7 +535,7 @@ def all_my_distances(N,N_Cell,value=0.2):
 
     Args:
         base_file (str): Path to the directory containing the phase data files.
-        N (int): The resolution of the new finer grid.
+        N_small_resolution (int): The resolution of the new finer grid.
         N_Cell (int): The total number of phases/cells to process.
         file_grid (str): Path to the fine grid file.
         value (float, optional): The threshold value for calculating the unsigned distance field. 
@@ -547,15 +555,7 @@ def all_my_distances(N,N_Cell,value=0.2):
 
     # assume that just works maybe change N -> N +/- 1 
     coordinates_small_grid = read_fine_grid(Small_fine_grid_path)
-    recalculate_indices(N,coordinates_small_grid)
-    
-    """
-    writer = vtk.vtkXMLUnstructuredGridWriter()
-    writer.SetInputData(h)        # Provide the grid to write
-    writer.SetFileName(os.path.join(Code_path, "extracted_grid2.vtu"))
-    writer.Write()  
-    """
-
+    recalculate_indices(N_small_resolution,coordinates_small_grid)
     #TODO: manage vtu files: we just need one small fine grid and it gets copied NCells times below
     small_grid_path = os.path.join(Code_path, f"small_fine_grid_template.vtu")
     
@@ -565,12 +565,11 @@ def all_my_distances(N,N_Cell,value=0.2):
         small_grid_i = read_vtu(small_grid_path)
         phasefield_path = os.path.join(Base_path, "phasedata", f"phase_p{i}_20.000.vtu")
         print(f"phasefield_path = {phasefield_path}")
-        phi_grid = extract_to_smaller_file(phasefield_path, small_grid_i, i)
-        # TODO: go on the following function call fails for i=5, why? 
+        phi_grid = extract_to_smaller_file(phasefield_path, small_grid_i, i, N_small_resolution)
         ud_i = calculate_unsigned_dist(40, phi_grid, value)
         small_grid_i = append_np_array(small_grid_i,ud_i,"ud_"+str(i))
-        write_path_i = os.path.join(Output_path, f"fine_mesh_{i}.vtu")
-        # write_vtu(small_grid_i, write_path_i)
+        write_path_i = os.path.join(Output_path, f"fine_mesh_{i}_distance.vtu")
+        write_vtu(small_grid_i, write_path_i)
 
 
     # TODO: adapt all_my_vertices so it can deal with 100 small grid files
@@ -787,7 +786,7 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
         my_points_i=np.array(all_vertices_collected[i])
         np.save(dir_vertices+'/phase_'+str(i),my_points_i)
 
-def create_and_save_uniform_triangular_grids(grid_length, output_path, N_Cells, N_resolution):
+def create_small_grid_template(grid_length, output_path, N_resolution):
     """
     Creates uniform triangular grids with specified resolution and saves them as `.vtu` files.
 
@@ -840,9 +839,9 @@ def create_and_save_uniform_triangular_grids(grid_length, output_path, N_Cells, 
                 grid.InsertNextCell(triangle2.GetCellType(), triangle2.GetPointIds())
 
         # Save the grid to `.vtu` files
-        for i in range(N_Cells):
-            file_name = os.path.join(output_path, f"fine_mesh_{i}_{N_resolution}x{N_resolution}.vtu")
-            write_vtu(grid, file_name)
+        file_name = os.path.join(Code_path, "small_fine_grid_template.vtu")
+        print(f"grid bounds = {grid.bounds}")
+        write_vtu(grid, file_name)
         return True
 
     except Exception as e:
@@ -937,15 +936,15 @@ def main():
 #### for creating the 100 small fine grids  
 def build():
     N_fine_resolution = 200 
-    grid_length = 40
-    print(create_and_save_uniform_triangular_grids(grid_length, Output_path, N_Cell, N_fine_resolution))
+    grid_length = 20
+    print(create_small_grid_template(grid_length, Output_path, N_fine_resolution))
 
 global N_Cell  
-N_Cell = 20
+N_Cell = 1
 N_fine_resolution = 200 
 eps = 0.1
-# all_my_midpoints(N_Cell)
+all_my_midpoints(N_Cell)
 # TODO: go on and check how all_my_distances works now 
-# all_my_distances(N_fine_resolution, N_Cell)
+all_my_distances(N_fine_resolution, N_Cell)
 
-build()
+
