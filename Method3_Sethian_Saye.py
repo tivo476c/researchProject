@@ -213,32 +213,38 @@ def extract_to_smaller_file(path_phi, fine_grid, i):
     grid_fine = fine_grid.GetOutput()
     phi = read_vtu(path_phi).GetOutput()
 
+    # print(f"phi = {phi}")
     midpoint_selected = all_midpoints[i]
     print(f"selected midpoint = {midpoint_selected}")
 
-    extracted_grid, _ = extract_phi(phi, midpoint_selected)
-    
-        # interpolate to fine grid 
+    extracted_grid, _ = extract_phi(phi, midpoint_selected, i)
+
+    if i == 5:
+        newWritePath = os.path.join(Output_path, "check5_extracted_1.vtu")
+        write_vtu(extracted_grid, newWritePath)
+
+    # interpolate to fine grid 
     interpolator = vtk.vtkResampleWithDataSet()
     interpolator.SetInputData(grid_fine)
     interpolator.SetSourceData(extracted_grid)
     interpolator.Update()
     h=interpolator.GetOutput()
-    
-    """
-    # save extracted grid to controll it 
-    writer = vtk.vtkXMLUnstructuredGridWriter()
-    writer.SetInputData(h)        # Provide the grid to write
-    writer.SetFileName(os.path.join(Code_path, "extracted_grid2.vtu"))
-    writer.Write()  
-    """
+
+    if i == 5:
+        newWritePath = os.path.join(Output_path, "check5_interpolated_1.vtu")
+        write_vtu(h, newWritePath)
+
+    write_path_i = os.path.join(Output_path, f"fine_mesh_{i}.vtu")
+    write_vtu(h,write_path_i)
 
     return VN.vtk_to_numpy(h.GetPointData().GetArray("phi"))
 
-def extract_phi(phi, midpoint):
+def extract_phi(phi, midpoint, i):
     """
     Extracts the scalar field `phi` from a given grid, considering periodic boundary conditions.
-    
+    The region containing midpoint must not be shifted! Somehow the interpolator cannot handle 
+    this case later on. 
+
     Args:
         phi (vtkUnstructuredGrid): The VTK grid containing the scalar field.
         x_min, x_max (float): Bounds in the x-direction (can be outside the domain [0, Lx]).
@@ -249,6 +255,8 @@ def extract_phi(phi, midpoint):
         np.ndarray: The scalar field values for the extracted subdomain considering periodicity.
     """
      
+    # is the problem, that the section containing the midpoint gets shifted for i=5? 
+
     x_min = midpoint[0] - 20
     x_max = midpoint[0] + 20
     y_min = midpoint[1] - 20
@@ -260,7 +268,7 @@ def extract_phi(phi, midpoint):
     y_min_wrapped = y_min  % 100
     y_max_wrapped = y_max  % 100
 
-    # Controll x_interval
+    # Control x_interval
     x_intervals = []
     if x_min_wrapped < x_max_wrapped:
         # no wrapping needed 
@@ -270,7 +278,7 @@ def extract_phi(phi, midpoint):
         x_intervals.append([x_min_wrapped, 100])
         x_intervals.append([0, x_max_wrapped])
    
-    # Controll y_interval
+    # Control y_interval
     y_intervals = []
     if y_min_wrapped < y_max_wrapped:
         # no wrapping needed 
@@ -285,47 +293,129 @@ def extract_phi(phi, midpoint):
             # everything is alright
             extracted_grid = extract_region(phi, x_min_wrapped, x_max_wrapped, y_min_wrapped, y_max_wrapped)
         elif len(y_intervals) == 2: 
-            # concatenate vertically
+            
             upper_grid = extract_region(phi, x_min_wrapped, x_max_wrapped, y_intervals[0][0], y_intervals[0][1]) 
             lower_grid = extract_region(phi, x_min_wrapped, x_max_wrapped, y_intervals[1][0], y_intervals[1][1]) 
-            # move upper grid under the lower grid 
-            upper_grid = shift_grid_vtk(upper_grid, dy=-100)
+            # concatenate vertically
+            if is_midpoint_in_region(midpoint, x_min_wrapped, x_max_wrapped,  y_intervals[0][0], y_intervals[0][1]):
+                # midpoint is in upper region
+                # move lower grid over the upper grid 
+                lower_grid = shift_grid_vtk(lower_grid, dy=100)
+            else: 
+                # midpoint is in lower region
+                # move upper grid under the lower grid 
+                upper_grid = shift_grid_vtk(upper_grid, dy=-100)
             extracted_grid = concatenate_grids(lower_grid, upper_grid) 
-                                             
+
+
     elif len(x_intervals) == 2:
         if len(y_intervals) == 1: 
             # concatenate horizontally
             right_grid = extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_min_wrapped, y_max_wrapped)
             left_grid = extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_min_wrapped, y_max_wrapped)
-            # move right grid next to the left grid 
-            right_grid = shift_grid_vtk(right_grid, dx=-100)
+            if is_midpoint_in_region(midpoint, x_intervals[0][0], x_intervals[0][1], y_min_wrapped, y_max_wrapped):
+                # midpoint is in right region
+                # move right grid next to the left grid 
+                left_grid = shift_grid_vtk(left_grid, dx=100)
+            else: 
+                # midpoint is in left region
+                # move right grid next to the left grid 
+                right_grid = shift_grid_vtk(right_grid, dx=-100)
             extracted_grid = concatenate_grids(right_grid, left_grid) 
 
         elif len(y_intervals) == 2:
             # we have to concatenate 4 grids :-( 
+
+            grid_upper_left = extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_intervals[0][0], y_intervals[0][1]) 
+            grid_lower_left = extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_intervals[1][0], y_intervals[1][1])
+            grid_upper_right = extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_intervals[0][0], y_intervals[0][1]) 
+            grid_lower_right = extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_intervals[1][0], y_intervals[1][1])
         	
-            # left part: 
-            grid_left_upper = extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_intervals[0][0], y_intervals[0][1]) 
-            grid_left_lower = extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_intervals[1][0], y_intervals[1][1])
-            # move upper grid under the lower grid 
-            grid_left_upper = shift_grid_vtk(grid_left_upper, dy=-100)
-            left_extracted_grid = concatenate_grids(grid_left_upper, grid_left_lower)  
+            if is_midpoint_in_region(midpoint, x_intervals[0][0], x_intervals[0][1], y_intervals[0][0], y_intervals[0][1]):
+                # midpoint is in upper right region 
+                # so we have to move left to right and lower to high
 
-            # right part: 
-            grid_right_upper = extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_intervals[0][0], y_intervals[0][1]) 
-            grid_right_lower = extract_region(phi, x_intervals[0][0], x_intervals[0][1], y_intervals[1][0], y_intervals[1][1])
-            # move upper grid under the lower grid 
-            grid_right_upper = shift_grid_vtk(grid_right_upper, dy=-100)
-            right_extracted_grid = concatenate_grids(grid_right_lower, grid_right_upper) 
+                # left part: 
+                # move upper grid under the lower grid 
+                grid_lower_left = shift_grid_vtk(grid_lower_left, dy=100)
+                left_extracted_grid = concatenate_grids(grid_upper_left, grid_lower_left)  
+    
+                # right part: 
+                # move upper grid under the lower grid 
+                grid_lower_right = shift_grid_vtk(grid_lower_right, dy=100)
+                right_extracted_grid = concatenate_grids(grid_lower_right, grid_upper_right)
+                
+                # move left grid right to the left grid 
+                left_extracted_grid = shift_grid_vtk(left_extracted_grid, dx=100)
 
-            # move right grid next to the left grid 
-            right_extracted_grid = shift_grid_vtk(right_extracted_grid, dx=-100)
-            extracted_grid = concatenate_grids(right_extracted_grid, left_extracted_grid) 
+                extracted_grid = concatenate_grids(right_extracted_grid, left_extracted_grid) 
+
+            elif is_midpoint_in_region(midpoint, x_intervals[1][0], x_intervals[1][1], y_intervals[0][0], y_intervals[0][1]):
+                # midpoint is in upper left region
+                # so we have to move right to left and lower to high
+
+                # left part: 
+                # move lower grid over the upper grid 
+                grid_lower_left = shift_grid_vtk(grid_lower_left, dy=100)
+                left_extracted_grid = concatenate_grids(grid_upper_left, grid_lower_left)  
+    
+                # right part: 
+                #  move lower grid over the upper grid 
+                grid_lower_right = shift_grid_vtk(grid_lower_right, dy=100)
+                right_extracted_grid = concatenate_grids(grid_lower_right, grid_upper_right)
+                
+                # move right grid left to the left grid 
+                right_extracted_grid = shift_grid_vtk(right_extracted_grid, dx=-100)
+
+                extracted_grid = concatenate_grids(right_extracted_grid, left_extracted_grid) 
+
+            elif is_midpoint_in_region(midpoint, x_intervals[1][0], x_intervals[1][1], y_intervals[1][0], y_intervals[1][1]):
+                # midpoint is in lower left region
+                # so we have to move right to left and upper to low 
+
+                # left part: 
+                # move upper grid under the lower grid 
+                grid_upper_left = shift_grid_vtk(grid_upper_left, dy=-100)
+                left_extracted_grid = concatenate_grids(grid_upper_left, grid_lower_left)  
+    
+                # right part: 
+                # move upper grid under the lower grid 
+                grid_upper_right = shift_grid_vtk(grid_upper_right, dy=-100)
+                right_extracted_grid = concatenate_grids(grid_lower_right, grid_upper_right)
+                
+                # move right grid left to the left grid 
+                right_extracted_grid = shift_grid_vtk(right_extracted_grid, dx=-100)
+
+                extracted_grid = concatenate_grids(right_extracted_grid, left_extracted_grid) 
+
+            elif is_midpoint_in_region(midpoint, x_intervals[0][0], x_intervals[0][1], y_intervals[1][0], y_intervals[1][1]):
+                # midpoint is in lower right region 
+                # so we have to move left to right and upper to low
+
+                # left part: 
+                # move upper grid under the lower grid 
+                grid_upper_left = shift_grid_vtk(grid_upper_left, dy=-100)
+                left_extracted_grid = concatenate_grids(grid_upper_left, grid_lower_left)  
+    
+                # right part: 
+                # move upper grid under the lower grid 
+                grid_upper_right = shift_grid_vtk(grid_upper_right, dy=-100)
+                right_extracted_grid = concatenate_grids(grid_lower_right, grid_upper_right)
+                
+                # move left grid right to the right grid 
+                left_extracted_grid = shift_grid_vtk(left_extracted_grid, dx=100)
+
+                extracted_grid = concatenate_grids(right_extracted_grid, left_extracted_grid) 
+            else:
+                raise ValueError("midpoint is not in the given area")
 
     # shift it so that midpoint -> 20,20 
     extracted_grid = shift_grid_vtk(extracted_grid, dx = 20 - midpoint[0], dy = 20 - midpoint[1])
 
     return extracted_grid, VN.vtk_to_numpy(extracted_grid.GetPointData().GetArray("phi"))
+
+def is_midpoint_in_region(midpoint, x_min, x_max, y_min, y_max):
+    return x_min <= midpoint[0] <= x_max and y_min <= midpoint[1] <= y_max
 
 def shift_grid_vtk(grid, dx=0.0, dy=0.0, dz=0.0):
     """
@@ -365,7 +455,7 @@ def extract_region(phi, x_min, x_max, y_min, y_max):
     """
     # Define a box to extract a subregion
     box = vtk.vtkBox()
-    box.SetBounds(x_min, x_max, y_min, y_max, -vtk.VTK_FLOAT_MAX, vtk.VTK_FLOAT_MAX)
+    box.SetBounds(x_min, x_max, y_min, y_max, 0, 0)
 
     # Set up the extractor
     extractor = vtk.vtkExtractGeometry()
@@ -474,14 +564,13 @@ def all_my_distances(N,N_Cell,value=0.2):
         print("resample loop ",i)
         small_grid_i = read_vtu(small_grid_path)
         phasefield_path = os.path.join(Base_path, "phasedata", f"phase_p{i}_20.000.vtu")
+        print(f"phasefield_path = {phasefield_path}")
         phi_grid = extract_to_smaller_file(phasefield_path, small_grid_i, i)
         # TODO: go on the following function call fails for i=5, why? 
         ud_i = calculate_unsigned_dist(40, phi_grid, value)
         small_grid_i = append_np_array(small_grid_i,ud_i,"ud_"+str(i))
         write_path_i = os.path.join(Output_path, f"fine_mesh_{i}.vtu")
-
-        # phi_grid = resample_phi_on_fine_grid(phasefield_path, small_grid, i)
-        write_vtu(small_grid_i, write_path_i)
+        # write_vtu(small_grid_i, write_path_i)
 
 
     # TODO: adapt all_my_vertices so it can deal with 100 small grid files
@@ -565,7 +654,7 @@ def calculate_unsigned_dist(N,phi,value):
     phi_new = np.zeros((N+1,N+1))
     phi_new = phi[indices_phi]
     phi_new -= value
-    unsigned_dist = skfmm.distance(phi_new,dx=np.array([dx,dx]),periodic=True)
+    unsigned_dist = skfmm.distance(phi_new,dx=np.array([dx,dx]),periodic=False)
     unsigned_dist_resorted = np.zeros((N+1)*(N+1))
     unsigned_dist_resorted = unsigned_dist[ind_phi_x,ind_phi_y]
     return unsigned_dist_resorted
@@ -752,13 +841,8 @@ def create_and_save_uniform_triangular_grids(grid_length, output_path, N_Cells, 
 
         # Save the grid to `.vtu` files
         for i in range(N_Cells):
-            file_name = os.path.join(output_path, f"fine_mesh_{i}.vtu")
-
-            writer = vtk.vtkXMLUnstructuredGridWriter()
-            writer.SetFileName(file_name)
-            writer.SetInputData(grid)
-            writer.Write()
-
+            file_name = os.path.join(output_path, f"fine_mesh_{i}_{N_resolution}x{N_resolution}.vtu")
+            write_vtu(grid, file_name)
         return True
 
     except Exception as e:
@@ -852,15 +936,16 @@ def main():
 
 #### for creating the 100 small fine grids  
 def build():
-    N_fine_resolution = 400 
+    N_fine_resolution = 200 
     grid_length = 40
-    create_and_save_uniform_triangular_grids(grid_length, Output_path, N_Cell, N_fine_resolution)
+    print(create_and_save_uniform_triangular_grids(grid_length, Output_path, N_Cell, N_fine_resolution))
 
 global N_Cell  
-N_Cell = 100
-N_fine_resolution = 400 
+N_Cell = 20
+N_fine_resolution = 200 
 eps = 0.1
-all_my_midpoints(N_Cell)
+# all_my_midpoints(N_Cell)
 # TODO: go on and check how all_my_distances works now 
-all_my_distances(N_fine_resolution, N_Cell)
+# all_my_distances(N_fine_resolution, N_Cell)
 
+build()
