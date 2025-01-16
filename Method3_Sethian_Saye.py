@@ -47,91 +47,6 @@ from copy import deepcopy
 import time
 
 
-### not used function: 
-
-def calculateInnerContour(filename,value=0.2):
-    """
-    Calculates and extracts the inner contour of a 2D scalar field from a VTK unstructured grid file.
-
-    The function reads a `.vtu` file, extracts a specific isosurface (contour) based on the provided scalar value, 
-    and processes the contour lines into structured numpy arrays. It uses VTK for reading and processing 
-    the unstructured grid data.
-
-    Args:
-        - filename (str): Path to the `.vtu` file containing the unstructured grid data.
-        - value (float, optional): Scalar value for the contour extraction. Defaults to 0.2.
-
-    Returns:
-        - store_p (list of numpy.ndarray): A list of arrays where each array represents 
-          the coordinates of a connected contour segment in 2D space.
-        - coords (numpy.ndarray): A 2D array of shape `(n_points, 2)` containing 
-          the sorted coordinates of the contour points in 2D space.
-    """
-    reader=vtk.vtkXMLUnstructuredGridReader()
-    reader.SetFileName(filename)
-    reader.Update()
-    data=reader.GetOutput()
-    
-        #Get contour for plotting
-    attr=reader.GetOutput().GetAttributes(0).GetArray("phi")
-    reader.GetOutput().GetPointData().SetScalars(attr)
-
-    # create contour filter
-    contour = vtk.vtkContourFilter()
-    contour.SetInputConnection(reader.GetOutputPort())
-    contour.SetValue(0,value)
-    contour.Update()
-    print(contour.GetOutput())
-    stripper=vtk.vtkStripper()
-    stripper.SetInputData(contour.GetOutput())
-    stripper.JoinContiguousSegmentsOn()
-    stripper.Update()
-    print("stripper")
-    print(stripper.GetOutput())
-    #contour=stripper
-    n_points = contour.GetOutput().GetNumberOfPoints()
-    coords = np.zeros((n_points,2))
-    for i in range(n_points):
-        coords[i,0],coords[i,1],_= contour.GetOutput().GetPoint(i)
-    lines=stripper.GetOutput().GetLines()
-    points=stripper.GetOutput().GetPoints()
-    lines.InitTraversal()
-    idList=vtk.vtkIdList()
-    store_p=[]
-    all_indices_p=[]
-    while lines.GetNextCell(idList):
-        p=[]
-        for i in range(0,idList.GetNumberOfIds()):
-            print(i)
-            p.append(points.GetPoint(idList.GetId(i)))
-            all_indices_p.append(idList.GetId(i))
-        p_arr=np.array(p)
-        store_p.append(p_arr)
-    #midpoint=np.mean(coords,axis=0)
-    #print(midpoint)
-    #coords=sort2d(coords,midpoint)
-    
-    return store_p,coords[np.array(all_indices_p),:]
-
-def interpolate_phi_on_fine_grid(name_coarse_grid, name_fine_grid):
-    """
-    Interpolates a the cell model for a given coarser grid on a finer grid. 
-    """
-    grid_fine=read_vtu(name_fine_grid)
-    phi=read_vtu(name_coarse_grid)
-    kernel=vtk.vtkGaussianKernel()
-    kernel.SetNullValue(-1.0)
-    interpolator=vtk.vtkPointInterpolator()
-    interpolator.SetInputData(grid_fine.GetOutput())
-    interpolator.SetSourceData(phi.GetOutput())
-    interpolator.SetKernel(kernel)
-    interpolator.Update()
-    h=interpolator.GetOutput()
-    print(h)
-    # set write path as you want 
-    write_vtu(h,r"test.vtu")
-    return
-
 ### used functions: 
 def time_it(func):
     """
@@ -199,13 +114,10 @@ def extract_to_smaller_file(path_phi, fine_grid, i, N_small_resolution):
     grid_fine = fine_grid.GetOutput()
     phi = read_vtu(path_phi).GetOutput()
 
-    # print(f"phi = {phi}")
     midpoint_selected = all_midpoints[i]
     print(f"selected midpoint = {midpoint_selected}")
 
     extracted_grid = extract_phi(phi, midpoint_selected, N_small_resolution)
-    
-    print(f"extracted_grid bounds = { extracted_grid.GetBounds() }")
     write_path_i = os.path.join(Output_path, f"fine_mesh_{i}_extracted.vtu")
     write_vtu(extracted_grid,write_path_i)
 
@@ -365,7 +277,6 @@ def extract_phi(phi, midpoint, N_small_resolution):
                 # midpoint is in lower left region
                 # so we have to move right to left and upper to low 
 
-                print("wir sind hier richtig :-p")
                 # left part: 
                 # move upper grid under the lower grid 
                 grid_upper_left = shift_grid_vtk(grid_upper_left, dy=-100)
@@ -498,16 +409,12 @@ def read_fine_grid(path_grid_file):
 def resample_phi_on_fine_grid(filename,filename_grid):
     grid_fine=read_vtu(filename_grid)
     phi=read_vtu(filename)
-    print(f"type of phi = {type(phi)}")
     interpolator=vtk.vtkResampleWithDataSet()
     interpolator.SetInputData(grid_fine.GetOutput())
     interpolator.SetSourceData(phi.GetOutput())
     interpolator.Update()
     h=interpolator.GetOutput()
-    #print(h)
-    #write_vtu(h,"/Users/Lea.Happel/Documents/Software_IWR/pAticsProject/team-project-p-atics/fine_meshes/test_interpolation.vtu")
     return h
-
 
 @time_it
 def all_my_distances(N_small_resolution,N_Cell,value=0.2):
@@ -534,15 +441,9 @@ def all_my_distances(N_small_resolution,N_Cell,value=0.2):
         fine_grid = all_my_distances(base_file, 100, 10, "fine_grid.vtu", 0.2)
     """
     
-    """ TODO
-    - input: one small fine grid as a template 
-    - output: NCells small fine grids with distances equipped
-    """
-
     # assume that just works maybe change N -> N +/- 1 
     coordinates_small_grid = read_fine_grid(Small_fine_grid_path)
     recalculate_indices(N_small_resolution,coordinates_small_grid)
-    #TODO: manage vtu files: we just need one small fine grid and it gets copied NCells times below
     small_grid_path = os.path.join(Code_path, f"small_fine_grid_template.vtu")
     
     for i in range(N_Cell):
@@ -550,7 +451,6 @@ def all_my_distances(N_small_resolution,N_Cell,value=0.2):
         print("resample loop ",i)
         small_grid_i = read_vtu(small_grid_path)
         phasefield_path = os.path.join(Base_path, "phasedata", f"phase_p{i}_20.000.vtu")
-        print(f"phasefield_path = {phasefield_path}")
         phi_grid = extract_to_smaller_file(phasefield_path, small_grid_i, i, N_small_resolution)
         ud_i = calculate_unsigned_dist(40, phi_grid, value)
         small_grid_i = append_np_array(small_grid_i,ud_i,"ud_"+str(i))
@@ -561,7 +461,6 @@ def all_my_distances(N_small_resolution,N_Cell,value=0.2):
     # TODO: adapt all_my_vertices so it can deal with 100 small grid files
     # all_my_vertices(fine_grid_new,N_Cell)
     
-
 def compute_neighbor_indices(i):
     """
     Computes all cell indices that must be featured in the grid of cell i. i itself is included.  
@@ -579,10 +478,6 @@ def discretize_to_big_file_ind(all_midpoints):
     for i in range(N_Cell):
         res[i] =round( all_midpoints[i] / dx) 
     return res 
-
-def is_point_in_subdomain(point, subdomain_center)->bool:
-    return  (subdomain_center[0]-200 <= point[0] <= subdomain_center[0]+200 and \
-             subdomain_center[1]-200 <= point[1] <= subdomain_center[1]+200      )
 
 def recalculate_indices(N,coords_grid):
     """
@@ -613,7 +508,6 @@ def recalculate_indices(N,coords_grid):
     ind_phi_y=np.zeros((N+1)*(N+1),dtype=int)
     UpperBound=100.0
     dx=UpperBound/N
-    print(f"in recalculate_indices we have: coords_grid.shape[0] = {coords_grid.shape[0]}")
     for i in range(coords_grid.shape[0]):
         # i must be in range(( res = N+1 )^2)
         # in the new function, we have res = 41   
@@ -682,7 +576,6 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
     all_vertices_collected=defaultdict(list)
     #Later on:Double loop
     for i in range(N_Cells):
-        print("NCells ",i)
     #NOW: get all the indices for which the midpoints are close
         possible_neighs=[]
         my_midpoint_i=all_midpoints[i,:]
@@ -738,7 +631,6 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
                 for k in range(len(coords_keys)):
                     diff_curr=abs(np.arctan2(np.sin(coords_keys[k-1]-coords_keys[k]),np.cos(coords_keys[k-1]-coords_keys[k])))
                     if (max_diff<diff_curr):
-                        #print(ind, diff_curr)
                         max_diff=diff_curr
                         ind=k
                         print(ind, diff_curr)
@@ -834,35 +726,6 @@ def create_small_grid_template(grid_length, output_path, N_resolution):
         print(f"An error occurred: {e}")
         return False
 
-def read_vtu_length(path):
-    """
-    Reads a `.vtu` file and calculates the length of the grid.
-    
-    Args:
-        path (str): Path to the `.vtu` file.
-
-    Returns:
-        float: Length of the grid.
-    """
-    try:
-        reader = vtk.vtkXMLUnstructuredGridReader()
-        reader.SetFileName(path)
-        reader.Update()
-        grid = reader.GetOutput()
-
-        # Extract bounding box
-        bounds = grid.GetBounds()  # [xmin, xmax, ymin, ymax, zmin, zmax]
-        length_x = bounds[1] - bounds[0]
-        length_y = bounds[3] - bounds[2]
-        length = max(length_x, length_y)
-
-        return length
-
-    except Exception as e:
-        print(f"Error reading VTU length: {e}")
-        return None
-
-
  
 # THIS FILE CONTAINS MULTIPLE HARDCODED THINGS WHICH MIGHT BE BENEFICIAL TO REMOVE
 # The periodicity of 100 is hardcoded
@@ -893,7 +756,6 @@ def read_vtu_length(path):
 
 
 # number of cells 
-# TODO: reset N_Cell = 100 
 
 def main():
     # old program process
