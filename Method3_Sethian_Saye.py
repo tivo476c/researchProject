@@ -1,12 +1,10 @@
 """
 PREREQUISITS: the following directories and files must be saved in the executing system: 
+* skfmm must be installed, you will probably need to install visual studio so that the installation of skfmm works
 * vtk-suite
 * phase field input file "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1"
-* fine grid file "grid_Harish_1000_1000.vtu"
-* .vtu file for saving unsigned distances "test_all_unsigned_dist.vtu"
-* directory that holds all fine grids for all cells 
 
-THE PATHS TO THESE FILES MUST BE SET MANUALLY IN THE NEXT LINES 
+THE FOLLOWING PATHS MUST BE SET MANUALLY IN THE NEXT LINES 
 """
 
 from pathlib import Path
@@ -15,32 +13,21 @@ import sys
 
 home = Path.home()
 
+# path to code directory
+Code_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code")
+
 # path to VTK suite:
-VTK_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code", "vtk-suite")
+VTK_path = os.path.join(Code_path, "vtk-suite")
 sys.path.append(VTK_path)
 
 # path for input file 
-Base_path = os.path.join(home, "OneDrive", "Desktop", "researchProject", "code", "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1")
-
-# path to grid 
-Grid_path_1000 = os.path.join(home,"OneDrive", "Desktop", "researchProject", "code", "grid_Harish_1000_1000.vtu")
-
-# path for saving output/test_all_unsigned_dist.vtu
-Write_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code", "output", "test_all_unsigned_dist_new.vtu")
+Base_path = os.path.join(Code_path, "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1")
 
 # Path to Output directory 
-Output_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code", "output")
+Output_path = os.path.join(Code_path, "output")
 
 # path to fine grid directory 
-Small_fine_grid_path = os.path.join(home,"OneDrive", "Desktop", "researchProject", "code", "small_fine_grid_template.vtu")
-
-# path to input example file 
-Example_grid_path = os.path.join(Base_path, "phasedata", "phase_p45_20.000.vtu")
-
-Code_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code")
-
-'/Users/Lea.Happel/Downloads/o20230614_set3_In3Ca3aa0ar0D0v5Al0Ga3Init1/phasedata/phase_p45_20.000.vtu'
-
+Small_fine_grid_path = os.path.join(Code_path, "small_fine_grid_template.vtu")
 
 import numpy as np
 import vtk
@@ -144,7 +131,6 @@ def interpolate_phi_on_fine_grid(name_coarse_grid, name_fine_grid):
     # set write path as you want 
     write_vtu(h,r"test.vtu")
     return
-
 
 ### used functions: 
 def time_it(func):
@@ -329,8 +315,8 @@ def extract_phi(phi, midpoint, N_small_resolution):
             
             grid_lower_left = extract_region(phi, x_intervals[1][0], x_intervals[1][1], y_intervals[1][0], y_intervals[1][1])
             
-            Write_path = os.path.join(Output_path, "lower_left_0.vtu")
-            write_vtu(grid_lower_left, Write_path)
+            #write_path = os.path.join(Output_path, "lower_left_0.vtu")
+            #write_vtu(grid_lower_left, write_path)
             
 
 
@@ -924,7 +910,6 @@ def main():
     N = 1000
     all_my_midpoints(Base_path,N_Cell)
     print(all_midpoints)
-    all_my_distances(Base_path,N,N_Cell,Grid_path_1000,eps)
 
     # c,d_a=calculateInnerContour(filename1)
     # print("c",c)
