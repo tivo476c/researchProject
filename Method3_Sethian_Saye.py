@@ -592,7 +592,7 @@ def all_my_vertices(N_Cells,r=20.0):
         possible_neighs=[]
         my_midpoint_i=all_midpoints[i,:]
         for j in range(i+1, N_Cells):
-            other_midpoint=all_midpoints[j,:]
+            other_midpoint = all_midpoints[j,:]
             other_midpoint=adjust_point(my_midpoint_i,other_midpoint,100.0)
             if (np.linalg.norm(my_midpoint_i-other_midpoint)<r):
                 possible_neighs.append(j)
@@ -614,40 +614,47 @@ def all_my_vertices(N_Cells,r=20.0):
                                      dx=all_midpoints[i][0] - 10, 
                                      dy=all_midpoints[i][1] - 10
                                      )
+        neighborhood_grid = append_small_grid_to_neighborhood_size(fine_grid_i, f"ud_{i}",neighborhood_grid)
 
         # append it here 
-        probe_filter  = vtk.vtkProbeFilter()
-        probe_filter.SetSourceData(fine_grid_i)  # The grid with `ud_i`
-        probe_filter.SetInputData(neighborhood_grid)        # The grid to map onto
-        probe_filter.Update()
+        append_grids = [fine_grid_i]
+        scalar_names = [f"ud_{i}"]
+        for j in possible_neighs:
+            small_fine_grid_j_path = os.path.join(Output_path, f"fine_mesh_{j}_distance.vtu")
+            fine_grid_j = read_vtu(small_fine_grid_j_path).GetOutput()
+            # move it such that: midpoint_grid -> midpoint[i]; midpoint_grid = (10, 10)
+            fine_grid_j = shift_grid_vtk(
+                                         fine_grid_j, 
+                                         dx=all_midpoints[j][0] - 10, 
+                                         dy=all_midpoints[j][1] - 10
+                                         )  
+            neighborhood_grid = append_small_grid_to_neighborhood_size(fine_grid_j, f"ud_{j}",neighborhood_grid)
 
-        write_vtu(probe_filter.GetOutput(), os.path.join(Output_path, "neighborhood1.vtu"))
-        '''
+
+
+        # REMEMBER TO SEARCH VERTICES ONLY IN GRID_I \CAP GRID_J COORDINATES
+
+     
+        
+        """
         print(f"now collecting all cells that are near midpoint[{i}]")
         for j in possible_neighs:
             # this excludes i 
             print(f"neighbor {j}")
 
-            """
             small_fine_grid_j_path = os.path.join(Output_path, f"fine_mesh_{j}_distance.vtu")
             fine_grid_j = read_vtu(small_fine_grid_j_path).GetOutput()
             # move it such that: midpoint_grid -> midpoint[i]; midpoint_grid = (10, 10)
-            dx = all_midpoints[j][0] - 10
-            dy = all_midpoints[j][1] - 10
-            fine_grid_j = shift_grid_vtk(fine_grid_j, dx=dx, dy=dy)
-            """
-            
-            small_fine_grid_j_path = os.path.join(Output_path, f"fine_mesh_{j}_distance.vtu")
-            fine_grid_j = read_vtu(small_fine_grid_j_path).GetOutput()
-            # move it such that: midpoint_grid -> midpoint[j]; midpoint_grid = (10, 10)
             fine_grid_j = shift_grid_vtk(
-                                     fine_grid_j, 
-                                     dx=all_midpoints[j][0] - 10, 
-                                     dy=all_midpoints[j][1] - 10
-                                     )
-            
-            
+                                         fine_grid_j, 
+                                         dx=all_midpoints[j][0] - 10, 
+                                         dy=all_midpoints[j][1] - 10
+                                         )     
 
+            # Now we need to add all ud_j from fine_grid_j to neighborhood and each creating a new array in neighborhood. We also need to add ud_i before 
+
+
+            
             # compute diff between i and j 
             calculator = vtk.vtkArrayCalculator()
             calculator.SetInputData(fine_grid.GetOutput())
@@ -728,8 +735,38 @@ def all_my_vertices(N_Cells,r=20.0):
 
         my_points_i=np.array(all_vertices_collected[i])
         np.save(Vertices_Path+'/phase_'+str(i),my_points_i)
-    '''
-        
+        """
+
+def append_small_grid_to_neighborhood_size(small_grid, array_name, neighborhood_grid): 
+
+    # Create a scalar array with default value -10
+    default_array = vtk.vtkDoubleArray()
+    default_array.SetName(array_name)
+    default_array.SetNumberOfTuples(neighborhood_grid.GetNumberOfPoints())
+    default_array.Fill(-10)  # Default value 
+
+    # Add the default array to the neighborhood grid
+    neighborhood_grid.GetPointData().AddArray(default_array)
+    neighborhood_grid.GetPointData().SetActiveScalars(array_name) 
+
+    probe_filter = vtk.vtkProbeFilter()
+    probe_filter.SetSourceData(small_grid)  
+    probe_filter.SetInputData(neighborhood_grid)  
+    probe_filter.Update()
+
+    interpolated_grid = probe_filter.GetOutput()
+
+    # Transfer interpolated scalar values to the neighborhood grid
+    interpolated_array = interpolated_grid.GetPointData().GetArray(array_name)
+    if interpolated_array:
+        neighborhood_grid.GetPointData().RemoveArray(array_name)  # Remove the old default array
+        neighborhood_grid.GetPointData().AddArray(interpolated_array)  # Add the interpolated array
+        neighborhood_grid.GetPointData().SetActiveScalars(array_name)  # Activate the new scalar array
+        return neighborhood_grid
+    else:
+        raise ValueError(f"Interpolation failed: '{array_name}' not found in the interpolated grid.")
+
+
 
 def create_small_grid_template(grid_length, output_path, N_resolution):
     """
@@ -854,7 +891,7 @@ def build():
     print(create_small_grid_template(grid_length, Output_path, N_fine_resolution))
 
 global N_Cell  
-N_Cell = 1
+N_Cell = 10
 N_fine_resolution = 200 
 eps = 0.1
 
