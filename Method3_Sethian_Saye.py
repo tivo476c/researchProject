@@ -651,11 +651,12 @@ def all_my_vertices(N_Cells,r=20.0):
             extractor.Update()
 
             subdomain = extractor.GetOutput()
-            write_vtu(subdomain, os.path.join(Output_path, f"subdomain_i-{i}_j-{j}.vtu"))
-            """
+            
+            # TODO: check whether coordinates are correct or need to be shifted to all_midpoints[i] 
+
             # compute diff between i and j 
             calculator = vtk.vtkArrayCalculator()
-            calculator.SetInputData(subdomain.GetOutput())
+            calculator.SetInputData(subdomain)
             calculator.AddScalarVariable("i", f"ud_{i}", 0)
             calculator.AddScalarVariable("j", f"ud_{j}", 0)
             calculator.SetFunction("i-j")
@@ -703,7 +704,7 @@ def all_my_vertices(N_Cells,r=20.0):
                         max_diff=diff_curr
                         ind=j
                         print(ind, diff_curr)
-            
+
                 #adjust coordinates
                 if coords_sorted[ind,0] > 100.0:
                     coords_sorted[ind,0] -= 100.0
@@ -733,7 +734,7 @@ def all_my_vertices(N_Cells,r=20.0):
 
         my_points_i=np.array(all_vertices_collected[i])
         np.save(Vertices_Path+'/phase_'+str(i),my_points_i)
-        """
+        
         
 def cap_grids_bounds(grid1, grid2):
     x_min1, x_max1, y_min1, y_max1, _, _ = grid1.GetBounds()
