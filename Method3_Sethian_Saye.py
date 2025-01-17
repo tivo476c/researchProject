@@ -617,8 +617,7 @@ def all_my_vertices(N_Cells,r=20.0):
         neighborhood_grid = append_small_grid_to_neighborhood_size(fine_grid_i, f"ud_{i}",neighborhood_grid)
 
         # append it here 
-        append_grids = [fine_grid_i]
-        scalar_names = [f"ud_{i}"]
+        neighborhood_grids_j = {}
         for j in possible_neighs:
             small_fine_grid_j_path = os.path.join(Output_path, f"fine_mesh_{j}_distance.vtu")
             fine_grid_j = read_vtu(small_fine_grid_j_path).GetOutput()
@@ -629,37 +628,36 @@ def all_my_vertices(N_Cells,r=20.0):
                                          dy=all_midpoints[j][1] - 10
                                          )  
             neighborhood_grid = append_small_grid_to_neighborhood_size(fine_grid_j, f"ud_{j}",neighborhood_grid)
+            neighborhood_grids_j[j] = fine_grid_j
 
-
-
-        # REMEMBER TO SEARCH VERTICES ONLY IN GRID_I \CAP GRID_J COORDINATES
-
-     
-        
-        """
+        # REMEMBER TO SEARCH VERTICES ONLY IN GRID_I \CAP GRID_J COORDINATES   
+                
         print(f"now collecting all cells that are near midpoint[{i}]")
+
         for j in possible_neighs:
             # this excludes i 
             print(f"neighbor {j}")
-
-            small_fine_grid_j_path = os.path.join(Output_path, f"fine_mesh_{j}_distance.vtu")
-            fine_grid_j = read_vtu(small_fine_grid_j_path).GetOutput()
-            # move it such that: midpoint_grid -> midpoint[i]; midpoint_grid = (10, 10)
-            fine_grid_j = shift_grid_vtk(
-                                         fine_grid_j, 
-                                         dx=all_midpoints[j][0] - 10, 
-                                         dy=all_midpoints[j][1] - 10
-                                         )     
-
-            # Now we need to add all ud_j from fine_grid_j to neighborhood and each creating a new array in neighborhood. We also need to add ud_i before 
-
-
             
+            # operating subdomain = grid_i cap grid_j 
+            x_min, x_max, y_min, y_max = cap_grids_bounds(fine_grid_i, neighborhood_grids_j[j])
+            box = vtk.vtkBox()
+            box.SetBounds([x_min, x_max, y_min, y_max, 0, 0])
+
+            extractor = vtk.vtkExtractGeometry()
+            extractor.SetInputData(neighborhood_grid)  # Input grid with arrays
+            extractor.SetImplicitFunction(box)
+            extractor.ExtractInsideOn()
+            extractor.ExtractBoundaryCellsOn()
+            extractor.Update()
+
+            subdomain = extractor.GetOutput()
+            write_vtu(subdomain, os.path.join(Output_path, f"subdomain_i-{i}_j-{j}.vtu"))
+            """
             # compute diff between i and j 
             calculator = vtk.vtkArrayCalculator()
-            calculator.SetInputData(fine_grid.GetOutput())
-            calculator.AddScalarVariable("i","ud_"+str(i), 0)
-            calculator.AddScalarVariable("j","ud_"+str(j), 0)
+            calculator.SetInputData(subdomain.GetOutput())
+            calculator.AddScalarVariable("i", f"ud_{i}", 0)
+            calculator.AddScalarVariable("j", f"ud_{j}", 0)
             calculator.SetFunction("i-j")
             calculator.SetResultArrayName("diff")
             calculator.Update()
@@ -736,6 +734,28 @@ def all_my_vertices(N_Cells,r=20.0):
         my_points_i=np.array(all_vertices_collected[i])
         np.save(Vertices_Path+'/phase_'+str(i),my_points_i)
         """
+        
+def cap_grids_bounds(grid1, grid2):
+    x_min1, x_max1, y_min1, y_max1, _, _ = grid1.GetBounds()
+    x_min2, x_max2, y_min2, y_max2, _, _ = grid2.GetBounds()
+
+    if x_min1 < x_min2: 
+        x_min_res = x_min2
+        x_max_res = x_max1 
+    else: 
+        x_min_res = x_min1
+        x_max_res = x_max2 
+
+    if y_min1 < y_min2: 
+        y_min_res = y_min2
+        y_max_res = y_max1 
+    else: 
+        y_min_res = y_min1
+        y_max_res = y_max2 
+
+    return x_min_res, x_max_res, y_min_res, y_max_res
+
+    
 
 def append_small_grid_to_neighborhood_size(small_grid, array_name, neighborhood_grid): 
 
@@ -765,8 +785,6 @@ def append_small_grid_to_neighborhood_size(small_grid, array_name, neighborhood_
         return neighborhood_grid
     else:
         raise ValueError(f"Interpolation failed: '{array_name}' not found in the interpolated grid.")
-
-
 
 def create_small_grid_template(grid_length, output_path, N_resolution):
     """
