@@ -11,6 +11,7 @@ THE PATHS TO THESE FILES MUST BE SET MANUALLY IN THE NEXT LINES
 import sys
 import os
 from pathlib import Path
+import vtk
 
 home = Path.home()
 # path to VTK suite:
@@ -36,13 +37,11 @@ from np_sorting_points import sort2d
 
 from Method3_Sethian_Saye import all_my_midpoints, adjust_point, time_it
 
-
-
-
 @time_it
 def clean_and_collect_my_vertices(base_vertices,N_Cell):
+    tol=2*0.1*np.sqrt(2)
     clean_vertices=[]
-    for i in range(N_Cell-1):
+    for i in range(N_Cell):
         print(f"i in clean and collect my vertices = {i}")
         clean_i=[] 
         dirty_i=np.load(base_vertices+'/phase_'+str(i)+'.npy')
@@ -53,7 +52,7 @@ def clean_and_collect_my_vertices(base_vertices,N_Cell):
             append_j=True 
             for k in clean_i:
                 #shift dirty_i[j,:] to the same side as k
-                dirty_vec_j=adjust_point(k,dirty_i[j,:])
+                dirty_vec_j=adjust_point(k,dirty_i[j,:],100)
                 if np.linalg.norm(k-dirty_vec_j)<tol:
                     append_j=False
                     break
@@ -61,9 +60,13 @@ def clean_and_collect_my_vertices(base_vertices,N_Cell):
                 clean_i.append(dirty_i[j,:])
         clean_vertices.append(np.array(clean_i))
         clean_array=np.array(clean_i)
-        #print(clean_array.shape)
-        #plt.scatter(clean_array[:,0],clean_array[:,1])
-        #plt.show()
+        print(clean_array.shape)
+        if i==34:
+            plt.scatter(clean_array[:,0],clean_array[:,1])
+            _, arr = calculateInnerContour(os.path.join(Base_path, "phasedata", "phase_p34_20.000.vtu"))
+            plt.plot(arr[:,0],arr[:,1])
+            plt.show()
+
     return clean_vertices
 
 ### following functions are just for plotting and i must not touch them  ---------------------------------
@@ -81,7 +84,7 @@ def m1_for_one_set(coords,midpoint,p=3):
                 coords[i,1]+=100.0
             else:
                 coords[i,1] -=100.0
-    re, im = calculate_shapefct_components_with_midpoint(coords,midpoint,p)
+    # re, im = calculate_shapefct_components_with_midpoint(coords,midpoint,p)
     mag=np.sqrt(re*re+im*im)
 
     my_angle=np.arctan2(im,re)/p
@@ -91,15 +94,16 @@ def m1_for_one_set(coords,midpoint,p=3):
 def plot_one_cell(coords,midpoint,magnitude,angle,p=3):
     #Assume that we have already manipulated coords
     coords_sorted=sort2d(coords,midpoint)
-    x_star,y_star=get_pAtic_star(angle,p,6)
+    #x_star,y_star=get_pAtic_star(angle,p,6)
     corr=[-100,100,0]
     plot_coords=np.zeros((coords_sorted.shape[0]+1,2))
     plot_coords[:-1,:]=coords_sorted
     plot_coords[-1,:]=coords_sorted[0,:]
     for c in corr:
         for d in corr:
-            plt.plot(x_star+midpoint[0]+c, y_star+midpoint[1]+d, linestyle='-', linewidth=2.0, color='r',alpha=magnitude)
+            #plt.plot(x_star+midpoint[0]+c, y_star+midpoint[1]+d, linestyle='-', linewidth=2.0, color='r',alpha=magnitude)
             plt.plot(plot_coords[:,0]+c,plot_coords[:,1]+d,color='k')
+    
 
 def plot_m1(dirname,base_vertices,pic_filename,NumberOfCells,p_vec):
     all_my_midpoints(dirname,NumberOfCells)
@@ -172,22 +176,90 @@ def collect_and_post_process_m1(dirname,base_vertices,pic_filename,NumberOfCells
         plt.savefig(pic_filename+str(p)+'.png',transparent=True,dpi=600)
         plt.savefig(pic_filename+str(p)+'.svg',transparent=True,dpi=600)
         plt.show()
+
+def calculateInnerContour(filename,value=0.2):
+    """
+    Calculates and extracts the inner contour of a 2D scalar field from a VTK unstructured grid file.
+
+    The function reads a `.vtu` file, extracts a specific isosurface (contour) based on the provided scalar value, 
+    and processes the contour lines into structured numpy arrays. It uses VTK for reading and processing 
+    the unstructured grid data.
+
+    Args:
+        - filename (str): Path to the `.vtu` file containing the unstructured grid data.
+        - value (float, optional): Scalar value for the contour extraction. Defaults to 0.2.
+
+    Returns:
+        - store_p (list of numpy.ndarray): A list of arrays where each array represents 
+          the coordinates of a connected contour segment in 2D space.
+        - coords (numpy.ndarray): A 2D array of shape `(n_points, 2)` containing 
+          the sorted coordinates of the contour points in 2D space.
+    """
+    reader=vtk.vtkXMLUnstructuredGridReader()
+    reader.SetFileName(filename)
+    reader.Update()
+    data=reader.GetOutput()
     
+        #Get contour for plotting
+    attr=reader.GetOutput().GetAttributes(0).GetArray("phi")
+    reader.GetOutput().GetPointData().SetScalars(attr)
+
+    # create contour filter
+    contour = vtk.vtkContourFilter()
+    contour.SetInputConnection(reader.GetOutputPort())
+    contour.SetValue(0,value)
+    contour.Update()
+    print(contour.GetOutput())
+    stripper=vtk.vtkStripper()
+    stripper.SetInputData(contour.GetOutput())
+    stripper.JoinContiguousSegmentsOn()
+    stripper.Update()
+    print("stripper")
+    print(stripper.GetOutput())
+    #contour=stripper
+    n_points = contour.GetOutput().GetNumberOfPoints()
+    coords = np.zeros((n_points,2))
+    for i in range(n_points):
+        coords[i,0],coords[i,1],dummy_argument= contour.GetOutput().GetPoint(i)
+    lines=stripper.GetOutput().GetLines()
+    points=stripper.GetOutput().GetPoints()
+    lines.InitTraversal()
+    idList=vtk.vtkIdList()
+    store_p=[]
+    all_indices_p=[]
+    while lines.GetNextCell(idList):
+        p=[]
+        for i in range(0,idList.GetNumberOfIds()):
+            print(i)
+            p.append(points.GetPoint(idList.GetId(i)))
+            all_indices_p.append(idList.GetId(i))
+        p_arr=np.array(p)
+        store_p.append(p_arr)
+    #midpoint=np.mean(coords,axis=0)
+    #print(midpoint)
+    #coords=sort2d(coords,midpoint)
+    print(f"all_indices_p = {all_indices_p}")
+
+    return store_p,coords[np.array(all_indices_p),:]
+
+
 # --------------------------------------------------------------------------------------------------------
 
 @time_it 
-def main():
+def main1234():
     #TODO: N_Cell=100
-    N_Cell=5
+    N_Cell=35
     eps=0.1
     global tol 
     tol=2*0.1*np.sqrt(2)
     global base_vertices
-    base_vertices = os.path.join(Base_path, 'vertices_not_cleaned_eps_'+str(eps))
-    all_my_midpoints(Base_path,N_Cell)
-    clean_and_collect_my_vertices(base_vertices,N_Cell)
+    base_vertices = os.path.join(Base_path, "vertices_not_cleaned_OLD_OUTPUT")
+    all_my_midpoints(N_Cell)
+    clean_and_collect_my_vertices(base_vertices,N_Cell) 
+    plt.show()
+    plt.savefig()
 
-    #plot_m1(Base_path,base_vertices,"/Users/Lea.Happel/Documents/Software_IWR/pAticsProject/team-project-p-atics/Pictures_Data_Harish/m3_p_",N_Cell,[2,3,4,5,6])
-    #collect_and_post_process_m1(Base_path,base_vertices,Output_path,N_Cell,[2,3,4,5,6],'darkorange')
+main1234()
+#plot_m1(Base_path,base_vertices,"/Users/Lea.Happel/Documents/Software_IWR/pAticsProject/team-project-p-atics/Pictures_Data_Harish/m3_p_",N_Cell,[2,3,4,5,6])
+#collect_and_post_process_m1(Base_path,base_vertices,Output_path,N_Cell,[2,3,4,5,6],'darkorange')
 
-main()

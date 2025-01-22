@@ -545,7 +545,7 @@ def calculate_unsigned_dist(N,phi,value):
     unsigned_dist_resorted = unsigned_dist[ind_phi_x,ind_phi_y]
     return unsigned_dist_resorted
 
-def adjust_point(ref,test_h,grid_length):
+def adjust_point(ref,test_h,grid_length=100):
     """
     Adjusts test point's coordinates to ensure they are within a 100-unit range of the reference point.
     """
@@ -593,7 +593,7 @@ def all_my_vertices(N_Cells,r=20.0):
         my_midpoint_i=all_midpoints[i,:]
         for j in range(i+1, N_Cells):
             other_midpoint = all_midpoints[j,:]
-            other_midpoint=adjust_point(my_midpoint_i,other_midpoint,100.0)
+            other_midpoint = adjust_point(my_midpoint_i,other_midpoint,100.0)
             if (np.linalg.norm(my_midpoint_i-other_midpoint)<r):
                 possible_neighs.append(j)
      
@@ -614,11 +614,13 @@ def all_my_vertices(N_Cells,r=20.0):
                                      dx=all_midpoints[i][0] - 10, 
                                      dy=all_midpoints[i][1] - 10
                                      )
+        
         neighborhood_grid = append_small_grid_to_neighborhood_size(fine_grid_i, f"ud_{i}",neighborhood_grid)
 
         # append it here 
         neighborhood_grids_j = {}
         for j in possible_neighs:
+            print(j)
             small_fine_grid_j_path = os.path.join(Output_path, f"fine_mesh_{j}_distance.vtu")
             fine_grid_j = read_vtu(small_fine_grid_j_path).GetOutput()
             # move it such that: midpoint_grid -> midpoint[i]; midpoint_grid = (10, 10)
@@ -630,6 +632,7 @@ def all_my_vertices(N_Cells,r=20.0):
             neighborhood_grid = append_small_grid_to_neighborhood_size(fine_grid_j, f"ud_{j}",neighborhood_grid)
             neighborhood_grids_j[j] = fine_grid_j
 
+        write_vtu(neighborhood_grid, os.path.join(Output_path, f"newNeighbors{i}.vtu"))
         # REMEMBER TO SEARCH VERTICES ONLY IN GRID_I \CAP GRID_J COORDINATES   
                 
         print(f"now collecting all cells that are near midpoint[{i}]")
@@ -651,14 +654,13 @@ def all_my_vertices(N_Cells,r=20.0):
             extractor.Update()
 
             subdomain = extractor.GetOutput()
-            
+            write_vtu(subdomain, os.path.join(Output_path, f"subdomain_i{i}_j{j}.vtu"))
             # TODO: check whether coordinates are correct or need to be shifted to all_midpoints[i] 
-
             # compute diff between i and j 
             calculator = vtk.vtkArrayCalculator()
             calculator.SetInputData(subdomain)
-            calculator.AddScalarVariable("i", f"ud_{i}", 0)
-            calculator.AddScalarVariable("j", f"ud_{j}", 0)
+            calculator.AddScalarVariable("i", f"ud_{i}_fixed", 0)
+            calculator.AddScalarVariable("j", f"ud_{j}_fixed", 0)
             calculator.SetFunction("i-j")
             calculator.SetResultArrayName("diff")
             calculator.Update()
@@ -679,8 +681,12 @@ def all_my_vertices(N_Cells,r=20.0):
                 coords[k,0], coords[k,1], _ = contour.GetOutput().GetPoint(k)
 
             for k in range(N_Cells):
-                array_all[k,:]=VN.vtk_to_numpy(contour.GetOutput().GetPointData().GetArray("ud_"+str(k)))
-
+                try:
+                    array_all[k,:]=VN.vtk_to_numpy(contour.GetOutput().GetPointData().GetArray(f"ud_{k}_fixed"))
+                except:
+                    # TODO: check this sus value
+                    array_all[k,:] = -2000
+            
             array_all=array_all -array_all[i,:][None,:]
             indices=np.where(array_all.max(axis=0)<=0.0)[0]
             if len(indices)>0:
@@ -699,6 +705,7 @@ def all_my_vertices(N_Cells,r=20.0):
                 max_diff=0
                 ind=-100
                 for j in range(len(coords_keys)):
+                    #TODO: check this line 
                     diff_curr=abs(np.arctan2(np.sin(coords_keys[j-1]-coords_keys[j]),np.cos(coords_keys[j-1]-coords_keys[j])))
                     if (max_diff<diff_curr):
                         max_diff=diff_curr
@@ -729,11 +736,14 @@ def all_my_vertices(N_Cells,r=20.0):
                 all_vertices_collected[i].append(coords_sorted[ind,:])
                 all_vertices_collected[i].append(coords_sorted[ind-1,:])
             
+                all_vertices_collected[j].append(coords_sorted[ind,:])
+                all_vertices_collected[j].append(coords_sorted[ind-1,:])
+            
             else:
                 print("no common boundary")
 
         my_points_i=np.array(all_vertices_collected[i])
-        np.save(Vertices_Path+'/phase_'+str(i),my_points_i)
+        np.save(f"{Vertices_Path}/phase_{i}",my_points_i)
         
         
 def cap_grids_bounds(grid1, grid2):
@@ -758,29 +768,40 @@ def cap_grids_bounds(grid1, grid2):
 
 def append_small_grid_to_neighborhood_size(small_grid, array_name, neighborhood_grid): 
 
-    # Create a scalar array with default value -10
+    """# Create a scalar array with default value -10
     default_array = vtk.vtkDoubleArray()
     default_array.SetName(array_name)
     default_array.SetNumberOfTuples(neighborhood_grid.GetNumberOfPoints())
-    default_array.Fill(-10)  # Default value 
+    default_array.Fill(-10)  # Default value """
 
     # Add the default array to the neighborhood grid
-    neighborhood_grid.GetPointData().AddArray(default_array)
-    neighborhood_grid.GetPointData().SetActiveScalars(array_name) 
+    #    neighborhood_grid.GetPointData().AddArray(default_array)
+    # neighborhood_grid.GetPointData().SetActiveScalars(array_name) 
 
     probe_filter = vtk.vtkProbeFilter()
     probe_filter.SetSourceData(small_grid)  
     probe_filter.SetInputData(neighborhood_grid)  
     probe_filter.Update()
 
-    interpolated_grid = probe_filter.GetOutput()
+    #write_vtu(probe_filter.GetOutput(), os.path.join(Output_path, "probefilter.vtu"))
+    #print("probe filter info \n", probe_filter.GetOutput())
+
+
+    calculator = vtk.vtkArrayCalculator()
+    calculator.SetInputData(probe_filter.GetOutput())
+    calculator.AddScalarVariable("ud", array_name, 0)
+    calculator.AddScalarVariable("valids", "vtkValidPointMask", 0)
+    calculator.SetFunction("ud+10*(valids-1)")
+    calculator.SetResultArrayName(array_name+"_fixed")
+    calculator.Update()
+
+    interpolated_grid = calculator.GetOutput()
 
     # Transfer interpolated scalar values to the neighborhood grid
-    interpolated_array = interpolated_grid.GetPointData().GetArray(array_name)
+    interpolated_array = interpolated_grid.GetPointData().GetArray(array_name+"_fixed")
     if interpolated_array:
-        neighborhood_grid.GetPointData().RemoveArray(array_name)  # Remove the old default array
         neighborhood_grid.GetPointData().AddArray(interpolated_array)  # Add the interpolated array
-        neighborhood_grid.GetPointData().SetActiveScalars(array_name)  # Activate the new scalar array
+        neighborhood_grid.GetPointData().SetActiveScalars(array_name+"_fixed")  # Activate the new scalar array
         return neighborhood_grid
     else:
         raise ValueError(f"Interpolation failed: '{array_name}' not found in the interpolated grid.")
@@ -878,7 +899,7 @@ def create_small_grid_template(grid_length, output_path, N_resolution):
 
 # number of cells 
 
-def main():
+def asmain1():
     # old program process
     N_Cell = 5
 
@@ -891,7 +912,7 @@ def main():
 
     # grid resolution
     N = 1000
-    all_my_midpoints(Base_path,N_Cell)
+    all_my_midpoints(N_Cell)
     print(all_midpoints)
 
     # c,d_a=calculateInnerContour(filename1)
@@ -908,13 +929,18 @@ def build():
     print(create_small_grid_template(grid_length, Output_path, N_fine_resolution))
 
 global N_Cell  
-N_Cell = 10
+N_Cell = 100
 N_fine_resolution = 200 
 eps = 0.1
-
 all_my_midpoints(N_Cell)
+
+for i in range(N_Cell):
+    midpoint = all_midpoints[i]
+    if 30 < midpoint[0] < 70 and 30 < midpoint[1] < 70:
+        print(f"midpoint {i} = {midpoint}")
+#all_my_midpoints(N_Cell)
 # TODO: go on and check how all_my_distances works now 
-all_my_distances(N_fine_resolution, N_Cell)
+#all_my_distances(N_fine_resolution, N_Cell)
 
 
 
