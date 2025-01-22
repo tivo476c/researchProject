@@ -44,7 +44,7 @@ def clean_and_collect_my_vertices(base_vertices,N_Cell):
     for i in range(N_Cell):
         print(f"i in clean and collect my vertices = {i}")
         clean_i=[] 
-        dirty_i=np.load(base_vertices+'/phase_'+str(i)+'.npy')
+        dirty_i=np.load(os.path.join(base_vertices, f"phase_{i}.npy"))
         print(f"dirty_i = {dirty_i}")
         print(dirty_i[0,:])
         clean_i.append(dirty_i[0,:])
@@ -61,11 +61,30 @@ def clean_and_collect_my_vertices(base_vertices,N_Cell):
         clean_vertices.append(np.array(clean_i))
         clean_array=np.array(clean_i)
         print(clean_array.shape)
-        if i==34:
-            plt.scatter(clean_array[:,0],clean_array[:,1])
-            _, arr = calculateInnerContour(os.path.join(Base_path, "phasedata", "phase_p34_20.000.vtu"))
-            plt.plot(arr[:,0],arr[:,1])
-            plt.show()
+
+
+    # plt.scatter(clean_array[:,0],clean_array[:,1])
+    # for i in range(N_Cell):
+    #     _, arr = calculateInnerContour(os.path.join(Base_path, "phasedata", "phase_p34_20.000.vtu"))
+    # plt.plot(arr[:,0],arr[:,1])
+    # plt.show()
+
+    plt.figure(figsize=(8, 8))
+    # Iterate through the cells and plot points
+    for _, cell_points in enumerate(clean_vertices):
+        cell_points = np.array(cell_points)  # Ensure it's a NumPy array
+        x_coords = cell_points[:, 0]
+        y_coords = cell_points[:, 1]
+        plt.scatter(x_coords, y_coords, label=False)
+    
+    for i in range(N_Cell):
+        _, arr = calculateInnerContour(os.path.join(Base_path, "phasedata", f"phase_p{i}_20.000.vtu"))
+        plt.plot(arr[:,0],arr[:,1], label=False)
+
+    plt.xlim(0, 100)  
+    plt.ylim(0, 100)  
+    plt.grid(True)
+    plt.gca().set_aspect('equal', adjustable='box')  # Ensure equal aspect ratio
 
     return clean_vertices
 
@@ -248,16 +267,16 @@ def calculateInnerContour(filename,value=0.2):
 @time_it 
 def main1234():
     #TODO: N_Cell=100
-    N_Cell=35
+    N_Cell=100
     eps=0.1
     global tol 
     tol=2*0.1*np.sqrt(2)
     global base_vertices
+    # base_vertices = os.path.join(Base_path, "vertices_not_cleaned_NEW")
     base_vertices = os.path.join(Base_path, "vertices_not_cleaned_OLD_OUTPUT")
-    all_my_midpoints(N_Cell)
+    # all_my_midpoints(N_Cell)
     clean_and_collect_my_vertices(base_vertices,N_Cell) 
     plt.show()
-    plt.savefig()
 
 main1234()
 #plot_m1(Base_path,base_vertices,"/Users/Lea.Happel/Documents/Software_IWR/pAticsProject/team-project-p-atics/Pictures_Data_Harish/m3_p_",N_Cell,[2,3,4,5,6])

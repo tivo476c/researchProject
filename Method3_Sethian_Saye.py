@@ -697,48 +697,50 @@ def all_my_vertices(N_Cells,r=20.0):
                 refvec=np.zeros(2)
                 refvec[0]=-ref_vec_h[1]
                 refvec[1]=ref_vec_h[0]
-                for j in indices:
-                    coords[j,:]=adjust_point(midpoint_i,coords[j,:],100.0)
+                for k in indices:
+                    coords[k,:]=adjust_point(midpoint_i,coords[k,:],100.0)
                 
                 coords_sorted,coords_keys=sort2d_with_key(coords[indices,:],midpoint_i,refvec)
-    
+
+                print(f"coords_sorted = {coords_sorted}, coords_keys = {coords_keys}")
                 max_diff=0
                 ind=-100
-                for j in range(len(coords_keys)):
+                for k in range(len(coords_keys)):
                     #TODO: check this line 
-                    diff_curr=abs(np.arctan2(np.sin(coords_keys[j-1]-coords_keys[j]),np.cos(coords_keys[j-1]-coords_keys[j])))
+                    diff_curr=abs(np.arctan2(np.sin(coords_keys[k-1]-coords_keys[k]),np.cos(coords_keys[k-1]-coords_keys[k])))
                     if (max_diff<diff_curr):
                         max_diff=diff_curr
-                        ind=j
+                        ind=k
                         print(ind, diff_curr)
 
-                #adjust coordinates
-                if coords_sorted[ind,0] > 100.0:
-                    coords_sorted[ind,0] -= 100.0
-                elif coords_sorted[ind,0] < 0.0:
-                    coords_sorted[ind,0] += 100.0
-            
-                if coords_sorted[ind,1] > 100.0:
-                    coords_sorted[ind,1] -= 100.0
-                elif coords_sorted[ind,1] < 0.0:
-                    coords_sorted[ind,1] += 100.0
+                if ind != -100:
+                    # adjust coordinates
+                    if coords_sorted[ind,0] > 100.0:
+                        coords_sorted[ind,0] -= 100.0
+                    elif coords_sorted[ind,0] < 0.0:
+                        coords_sorted[ind,0] += 100.0
                 
-                if coords_sorted[ind-1,0] > 100.0:
-                    coords_sorted[ind-1,0] -= 100.0
-                elif coords_sorted[ind-1,0] < 0.0:
-                    coords_sorted[ind-1,0] += 100.0
+                    if coords_sorted[ind,1] > 100.0:
+                        coords_sorted[ind,1] -= 100.0
+                    elif coords_sorted[ind,1] < 0.0:
+                        coords_sorted[ind,1] += 100.0
+                    
+                    if coords_sorted[ind-1,0] > 100.0:
+                        coords_sorted[ind-1,0] -= 100.0
+                    elif coords_sorted[ind-1,0] < 0.0:
+                        coords_sorted[ind-1,0] += 100.0
+                    
+                    if coords_sorted[ind-1,1] > 100.0:
+                        coords_sorted[ind-1,1] -= 100.0
+                    elif coords_sorted[ind-1,1] < 0.0:
+                        coords_sorted[ind-1,1] += 100.0
                 
-                if coords_sorted[ind-1,1] > 100.0:
-                    coords_sorted[ind-1,1] -= 100.0
-                elif coords_sorted[ind-1,1] < 0.0:
-                    coords_sorted[ind-1,1] += 100.0
-            
-                all_vertices_collected[i].append(coords_sorted[ind,:])
-                all_vertices_collected[i].append(coords_sorted[ind-1,:])
-            
-                all_vertices_collected[j].append(coords_sorted[ind,:])
-                all_vertices_collected[j].append(coords_sorted[ind-1,:])
-            
+                    all_vertices_collected[i].append(coords_sorted[ind,:])
+                    all_vertices_collected[i].append(coords_sorted[ind-1,:])
+                
+                    all_vertices_collected[j].append(coords_sorted[ind,:])
+                    all_vertices_collected[j].append(coords_sorted[ind-1,:])
+                
             else:
                 print("no common boundary")
 
@@ -932,12 +934,12 @@ global N_Cell
 N_Cell = 100
 N_fine_resolution = 200 
 eps = 0.1
-all_my_midpoints(N_Cell)
 
-for i in range(N_Cell):
-    midpoint = all_midpoints[i]
-    if 30 < midpoint[0] < 70 and 30 < midpoint[1] < 70:
-        print(f"midpoint {i} = {midpoint}")
+# for i in range(N_Cell):
+#     midpoint = all_midpoints[i]
+#     if 30 < midpoint[0] < 70 and 30 < midpoint[1] < 70:
+#         print(f"midpoint {i} = {midpoint}")
+
 #all_my_midpoints(N_Cell)
 # TODO: go on and check how all_my_distances works now 
 #all_my_distances(N_fine_resolution, N_Cell)
