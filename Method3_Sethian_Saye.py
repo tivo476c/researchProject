@@ -754,9 +754,7 @@ def cap_grids_bounds(grid1, grid2):
         y_min_res = y_min1
         y_max_res = y_max2 
 
-    return x_min_res, x_max_res, y_min_res, y_max_res
-
-    
+    return x_min_res, x_max_res, y_min_res, y_max_res 
 
 def append_small_grid_to_neighborhood_size(small_grid, array_name, neighborhood_grid): 
 
