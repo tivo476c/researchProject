@@ -9,6 +9,10 @@ home = Path.home()
 # C:\Users\voglt\OneDrive\Desktop\researchProject\code\vtk-suite
 sys.path.append(os.path.join(home, "Onedrive", "Desktop", "researchProject", "code", "vtk-suite"))
 
+Code_path = os.path.join(home, "Onedrive", "Desktop", "researchProject", "code")
+Base_path = os.path.join(Code_path, "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1")
+Vertices_Path = os.path.join(Base_path, "vertices_not_cleaned_OLD_OUTPUT")
+
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -262,6 +266,7 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
                 coords[k,0],coords[k,1],dummy_argument= contour.GetOutput().GetPoint(k)
             for k in range(N_Cells):
                 array_all[k,:]=VN.vtk_to_numpy(contour.GetOutput().GetPointData().GetArray("ud_"+str(k)))
+            
             array_all=array_all -array_all[i,:][None,:]
             indices=np.where(array_all.max(axis=0)<=0.0)[0]
             print("i ", i ,"j ",j)
@@ -315,7 +320,9 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
             else:
                 print("no common boundary")
         my_points_i=np.array(all_vertices_collected[i])
-        np.save(dir_vertices+'/phase_'+str(i),my_points_i)
+        #np.save(dir_vertices+'/phase_'+str(i),my_points_i)
+        np.save(f"{Vertices_Path}/phase_{i}",my_points_i)
+
         
     
 
@@ -346,7 +353,7 @@ def all_my_vertices(fine_grid,N_Cells,r=20.0):
 # clean_and_collect_my_vertices
 base_file=os.path.join(home,"OneDrive", "Desktop", "researchProject", "code", "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1")
 # filename1='/Users/Lea.Happel/Downloads/o20230614_set3_In3Ca3aa0ar0D0v5Al0Ga3Init1/phasedata/phase_p45_20.000.vtu'
-N_Cell=1
+N_Cell=35
 eps=0.1
 filename = f"vertices_not_cleaned_eps_{eps}"
 dir_vertices=os.path.join(base_file, filename)
