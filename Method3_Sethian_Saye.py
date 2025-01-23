@@ -624,12 +624,14 @@ def all_my_vertices(N_Cells,r=20.0):
             print(j)
             small_fine_grid_j_path = os.path.join(Output_path, f"fine_mesh_{j}_distance.vtu")
             fine_grid_j = read_vtu(small_fine_grid_j_path).GetOutput()
+            other_midpoint = all_midpoints[j,:]
+            other_midpoint = adjust_point(my_midpoint_i,other_midpoint,100.0)
             # move it such that: midpoint_grid -> midpoint[i]; midpoint_grid = (10, 10)
             fine_grid_j = shift_grid_vtk(
                                          fine_grid_j, 
-                                         dx=all_midpoints[j][0] - 10, 
-                                         dy=all_midpoints[j][1] - 10
-                                         )  
+                                         dx=other_midpoint[0] - 10,
+                                         dy=other_midpoint[1] - 10
+                                         )
             neighborhood_grid = append_small_grid_to_neighborhood_size(fine_grid_j, f"ud_{j}",neighborhood_grid)
             neighborhood_grids_j[j] = fine_grid_j
 
