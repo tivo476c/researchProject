@@ -659,8 +659,8 @@ def all_my_vertices(N_Cells,r=20.0):
             # compute diff between i and j 
             calculator = vtk.vtkArrayCalculator()
             calculator.SetInputData(subdomain)
-            calculator.AddScalarVariable("i", f"ud_{i}_fixed", 0)
-            calculator.AddScalarVariable("j", f"ud_{j}_fixed", 0)
+            calculator.AddScalarVariable("i", f"ud_{i}_fixed")
+            calculator.AddScalarVariable("j", f"ud_{j}_fixed")
             calculator.SetFunction("i-j")
             calculator.SetResultArrayName("diff")
             calculator.Update()

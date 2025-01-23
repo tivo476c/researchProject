@@ -42,11 +42,11 @@ def clean_and_collect_my_vertices(base_vertices,N_Cell):
     tol=2*0.1*np.sqrt(2)
     clean_vertices=[]
     for i in range(N_Cell):
-        print(f"i in clean and collect my vertices = {i}")
+        #print(f"i in clean and collect my vertices = {i}")
         clean_i=[] 
         dirty_i=np.load(os.path.join(base_vertices, f"phase_{i}.npy"))
-        print(f"dirty_i = {dirty_i}")
-        print(dirty_i[0,:])
+        #print(f"dirty_i = {dirty_i}")
+        #print(dirty_i[0,:])
         clean_i.append(dirty_i[0,:])
         for j in range(1,dirty_i.shape[0]):
             append_j=True 
@@ -60,7 +60,7 @@ def clean_and_collect_my_vertices(base_vertices,N_Cell):
                 clean_i.append(dirty_i[j,:])
         clean_vertices.append(np.array(clean_i))
         clean_array=np.array(clean_i)
-        print(clean_array.shape)
+        #print(clean_array.shape)
 
 
     # plt.scatter(clean_array[:,0],clean_array[:,1])
@@ -79,7 +79,14 @@ def clean_and_collect_my_vertices(base_vertices,N_Cell):
     
     for i in range(N_Cell):
         _, arr = calculateInnerContour(os.path.join(Base_path, "phasedata", f"phase_p{i}_20.000.vtu"))
-        plt.plot(arr[:,0],arr[:,1], label=False)
+        grouped_arr = group_vertices(arr)
+        if len(grouped_arr) == 1:
+            for array in grouped_arr:
+                plt.plot(array[:,0],array[:,1], label=False)
+        else:    
+            for array in grouped_arr:
+                plt.plot(array[:, 0], array[:, 1], label="Polygon Outline", linestyle="-")  # Connect all points
+                plt.plot([array[-1, 0], array[0, 0]], [array[-1, 1], array[0, 1]], linestyle="", marker="")  # Skip connecting last to first
 
     plt.xlim(0, 100)  
     plt.ylim(0, 100)  
@@ -89,6 +96,49 @@ def clean_and_collect_my_vertices(base_vertices,N_Cell):
     return clean_vertices
 
 ### following functions are just for plotting and i must not touch them  ---------------------------------
+
+def group_vertices(input_array, max_distance=40):
+    """
+    Groups vertices into clusters such that all vertices in a cluster are within `max_distance` of each other.
+
+    Args:
+        argument (np.ndarray): Input array of shape (n, 2), where n is the number of points.
+        max_distance (float): Maximum allowable distance between any two points in the same cluster.
+
+    Returns:
+        list of np.ndarray: List of arrays, where each array contains points belonging to one cluster.
+    """
+    n_points = input_array.shape[0]
+    if n_points == 0:
+        return []  # Return an empty list if there are no points
+
+    remaining_indices = set(range(n_points))  # Indices of points not yet assigned to a cluster
+    clusters = []
+
+    while remaining_indices:
+        # Start a new cluster
+        cluster = []
+        seed_index = remaining_indices.pop()  # Take an arbitrary point as the seed for the cluster
+        cluster.append(input_array[seed_index])
+
+        # Check distances for the rest of the points
+        to_check = [seed_index]
+        while to_check:
+            current_index = to_check.pop()
+            current_point = input_array[current_index]
+
+            # Find all points within max_distance of the current point
+            for idx in list(remaining_indices):  # Convert to list to safely iterate and modify
+                if np.linalg.norm(input_array[idx] - current_point) <= max_distance:
+                    cluster.append(input_array[idx])
+                    to_check.append(idx)
+                    remaining_indices.remove(idx)
+
+        # Add the cluster as a NumPy array to the result
+        clusters.append(np.array(cluster))
+
+    return clusters
+
 
 def m1_for_one_set(coords,midpoint,p=3):
     n_points=coords.shape[0]
@@ -228,13 +278,13 @@ def calculateInnerContour(filename,value=0.2):
     contour.SetInputConnection(reader.GetOutputPort())
     contour.SetValue(0,value)
     contour.Update()
-    print(contour.GetOutput())
+    #print(contour.GetOutput())
     stripper=vtk.vtkStripper()
     stripper.SetInputData(contour.GetOutput())
     stripper.JoinContiguousSegmentsOn()
     stripper.Update()
-    print("stripper")
-    print(stripper.GetOutput())
+    #print("stripper")
+    #print(stripper.GetOutput())
     #contour=stripper
     n_points = contour.GetOutput().GetNumberOfPoints()
     coords = np.zeros((n_points,2))
@@ -257,7 +307,7 @@ def calculateInnerContour(filename,value=0.2):
     #midpoint=np.mean(coords,axis=0)
     #print(midpoint)
     #coords=sort2d(coords,midpoint)
-    print(f"all_indices_p = {all_indices_p}")
+    #print(f"all_indices_p = {all_indices_p}")
 
     return store_p,coords[np.array(all_indices_p),:]
 
@@ -272,8 +322,8 @@ def main1234():
     global tol 
     tol=2*0.1*np.sqrt(2)
     global base_vertices
-    # base_vertices = os.path.join(Base_path, "vertices_not_cleaned_NEW")
-    base_vertices = os.path.join(Base_path, "vertices_not_cleaned_OLD_OUTPUT")
+    base_vertices = os.path.join(Base_path, "vertices_not_cleaned_NEW")
+    #base_vertices = os.path.join(Base_path, "vertices_not_cleaned_OLD_OUTPUT")
     # all_my_midpoints(N_Cell)
     clean_and_collect_my_vertices(base_vertices,N_Cell) 
     plt.show()
