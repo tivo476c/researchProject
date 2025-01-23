@@ -694,7 +694,7 @@ def all_my_vertices(N_Cells,r=20.0):
             
             array_all=array_all -array_all[i,:][None,:]
             indices=np.where(array_all.max(axis=0)<=0.0)[0]
-            if len(indices)>0:
+            if len(indices)>1:
                 midpoint_i=all_midpoints[i,:]
                 midpoint_j=adjust_point(midpoint_i,all_midpoints[j,:],100.0)
             
