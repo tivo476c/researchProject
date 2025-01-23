@@ -599,12 +599,20 @@ def all_my_vertices(N_Cells,r=20.0):
                     possible_neighs.append(j)
      
         
-        # now create operating grid 
+        # now create operating grid
+        '''
         neighborhood_grid = read_vtu(Fine_grid_600x600_path).GetOutput()
         neighborhood_grid = shift_grid_vtk(
                                            neighborhood_grid, 
                                            dx = all_midpoints[i][0] - 30, 
                                            dy = all_midpoints[i][1] - 30
+                                           )
+        '''
+        neighborhood_grid = read_vtu(Fine_grid_200x200_path).GetOutput()
+        neighborhood_grid = shift_grid_vtk(
+                                           neighborhood_grid,
+                                           dx = all_midpoints[i][0] - 10,
+                                           dy = all_midpoints[i][1] - 10
                                            )
 
         small_fine_grid_i_path = os.path.join(Output_path, f"fine_mesh_{i}_distance.vtu")
