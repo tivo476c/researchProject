@@ -591,19 +591,28 @@ def all_my_vertices(N_Cells,r=20.0):
         
         possible_neighs=[]
         my_midpoint_i=all_midpoints[i,:]
-        for j in range(i+1, N_Cells):
-            other_midpoint = all_midpoints[j,:]
-            other_midpoint = adjust_point(my_midpoint_i,other_midpoint,100.0)
-            if (np.linalg.norm(my_midpoint_i-other_midpoint)<r):
-                possible_neighs.append(j)
+        for j in range(N_Cells):
+            if (j != i):
+                other_midpoint = all_midpoints[j,:]
+                other_midpoint = adjust_point(my_midpoint_i,other_midpoint,100.0)
+                if (np.linalg.norm(my_midpoint_i-other_midpoint)<r):
+                    possible_neighs.append(j)
      
         
-        # now create operating grid 
+        # now create operating grid
+        '''
         neighborhood_grid = read_vtu(Fine_grid_600x600_path).GetOutput()
         neighborhood_grid = shift_grid_vtk(
                                            neighborhood_grid, 
                                            dx = all_midpoints[i][0] - 30, 
                                            dy = all_midpoints[i][1] - 30
+                                           )
+        '''
+        neighborhood_grid = read_vtu(Fine_grid_200x200_path).GetOutput()
+        neighborhood_grid = shift_grid_vtk(
+                                           neighborhood_grid,
+                                           dx = all_midpoints[i][0] - 10,
+                                           dy = all_midpoints[i][1] - 10
                                            )
 
         small_fine_grid_i_path = os.path.join(Output_path, f"fine_mesh_{i}_distance.vtu")
@@ -623,12 +632,14 @@ def all_my_vertices(N_Cells,r=20.0):
             print(j)
             small_fine_grid_j_path = os.path.join(Output_path, f"fine_mesh_{j}_distance.vtu")
             fine_grid_j = read_vtu(small_fine_grid_j_path).GetOutput()
+            other_midpoint = all_midpoints[j,:]
+            other_midpoint = adjust_point(my_midpoint_i,other_midpoint,100.0)
             # move it such that: midpoint_grid -> midpoint[i]; midpoint_grid = (10, 10)
             fine_grid_j = shift_grid_vtk(
                                          fine_grid_j, 
-                                         dx=all_midpoints[j][0] - 10, 
-                                         dy=all_midpoints[j][1] - 10
-                                         )  
+                                         dx=other_midpoint[0] - 10,
+                                         dy=other_midpoint[1] - 10
+                                         )
             neighborhood_grid = append_small_grid_to_neighborhood_size(fine_grid_j, f"ud_{j}",neighborhood_grid)
             neighborhood_grids_j[j] = fine_grid_j
 
@@ -638,7 +649,9 @@ def all_my_vertices(N_Cells,r=20.0):
         print(f"now collecting all cells that are near midpoint[{i}]")
 
         for j in possible_neighs:
-            # this excludes i 
+            if (j<i):
+                continue
+            # this excludes i
             print(f"neighbor {j}")
             
             # operating subdomain = grid_i cap grid_j 
@@ -689,7 +702,7 @@ def all_my_vertices(N_Cells,r=20.0):
             
             array_all=array_all -array_all[i,:][None,:]
             indices=np.where(array_all.max(axis=0)<=0.0)[0]
-            if len(indices)>0:
+            if len(indices)>1:
                 midpoint_i=all_midpoints[i,:]
                 midpoint_j=adjust_point(midpoint_i,all_midpoints[j,:],100.0)
             
@@ -787,13 +800,15 @@ def append_small_grid_to_neighborhood_size(small_grid, array_name, neighborhood_
 
     #write_vtu(probe_filter.GetOutput(), os.path.join(Output_path, "probefilter.vtu"))
     #print("probe filter info \n", probe_filter.GetOutput())
-
+    print("array_name",int(array_name[3:]))
+    my_str="ud+"+"(70+"+array_name[3:]+")*(valids-1)"
+    #print(my_str)
 
     calculator = vtk.vtkArrayCalculator()
     calculator.SetInputData(probe_filter.GetOutput())
     calculator.AddScalarVariable("ud", array_name, 0)
     calculator.AddScalarVariable("valids", "vtkValidPointMask", 0)
-    calculator.SetFunction("ud+10*(valids-1)")
+    calculator.SetFunction(my_str)
     calculator.SetResultArrayName(array_name+"_fixed")
     calculator.Update()
 
