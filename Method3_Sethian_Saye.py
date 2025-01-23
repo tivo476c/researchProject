@@ -591,11 +591,12 @@ def all_my_vertices(N_Cells,r=20.0):
         
         possible_neighs=[]
         my_midpoint_i=all_midpoints[i,:]
-        for j in range(i+1, N_Cells):
-            other_midpoint = all_midpoints[j,:]
-            other_midpoint = adjust_point(my_midpoint_i,other_midpoint,100.0)
-            if (np.linalg.norm(my_midpoint_i-other_midpoint)<r):
-                possible_neighs.append(j)
+        for j in range(N_Cells):
+            if (j != i):
+                other_midpoint = all_midpoints[j,:]
+                other_midpoint = adjust_point(my_midpoint_i,other_midpoint,100.0)
+                if (np.linalg.norm(my_midpoint_i-other_midpoint)<r):
+                    possible_neighs.append(j)
      
         
         # now create operating grid 
@@ -638,7 +639,9 @@ def all_my_vertices(N_Cells,r=20.0):
         print(f"now collecting all cells that are near midpoint[{i}]")
 
         for j in possible_neighs:
-            # this excludes i 
+            if (j<i):
+                continue
+            # this excludes i
             print(f"neighbor {j}")
             
             # operating subdomain = grid_i cap grid_j 
