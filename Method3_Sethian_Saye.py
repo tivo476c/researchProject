@@ -800,13 +800,15 @@ def append_small_grid_to_neighborhood_size(small_grid, array_name, neighborhood_
 
     #write_vtu(probe_filter.GetOutput(), os.path.join(Output_path, "probefilter.vtu"))
     #print("probe filter info \n", probe_filter.GetOutput())
-
+    print("array_name",int(array_name[3:]))
+    my_str="ud+"+"(70+"+array_name[3:]+")*(valids-1)"
+    #print(my_str)
 
     calculator = vtk.vtkArrayCalculator()
     calculator.SetInputData(probe_filter.GetOutput())
     calculator.AddScalarVariable("ud", array_name, 0)
     calculator.AddScalarVariable("valids", "vtkValidPointMask", 0)
-    calculator.SetFunction("ud+10*(valids-1)")
+    calculator.SetFunction(my_str)
     calculator.SetResultArrayName(array_name+"_fixed")
     calculator.Update()
 
