@@ -959,7 +959,7 @@ eps = 0.1
 #     if 30 < midpoint[0] < 70 and 30 < midpoint[1] < 70:
 #         print(f"midpoint {i} = {midpoint}")
 
-def startRun(midpointsDirectoryPath, phasefieldDirectoryPath, output_path):
+def startRunMethod3(midpointsDirectoryPath, phasefieldDirectoryPath, output_path):
 
     global Midpoints_dir_Path 
     Midpoints_dir_Path = midpointsDirectoryPath
