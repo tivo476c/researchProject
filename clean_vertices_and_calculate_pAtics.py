@@ -39,7 +39,8 @@ from Method3_Sethian_Saye import all_my_midpoints, adjust_point, time_it
 
 @time_it
 def clean_and_collect_my_vertices(base_vertices,N_Cell):
-    tol=2*0.1*np.sqrt(2)
+    # tol=2*0.1*np.sqrt(2)
+    tol=0.4
     clean_vertices=[]
     for i in range(N_Cell):
         #print(f"i in clean and collect my vertices = {i}")
@@ -66,38 +67,40 @@ def clean_and_collect_my_vertices(base_vertices,N_Cell):
         #print(clean_array.shape)
     
     
-    clean_vertices_filtered = collect_and_filter_to_1array(clean_vertices)
+    collected_vertices = collect_to_1array(clean_vertices)
+    filtered_vertices = filter_double_points(collected_vertices)
 
     #print(f"clean_vertices = \n {clean_vertices}")
     #print(f"dims_clean_vertices = {np.ndim(clean_vertices)}")
     #print(f"shape_clean_vertices = {np.shape(clean_vertices)}")
-    print(f"size clean_vertices_filtered = {np.size(clean_vertices_filtered)}")
-    print(f"len clean_vertices_filtered = {len(clean_vertices_filtered)}")
+    print(f"size collected_vertices = {np.size(collected_vertices)}")
+    print(f"len collected_vertices = {len(collected_vertices)}")
+    
+    print(f"size filtered_vertices = {np.size(filtered_vertices)}")
+    print(f"len filtered_vertices = {len(filtered_vertices)}")
 
-    # plt.scatter(clean_array[:,0],clean_array[:,1])
-    # for i in range(N_Cell):
-    #     _, arr = calculateInnerContour(os.path.join(Base_path, "phasedata", "phase_p34_20.000.vtu"))
-    # plt.plot(arr[:,0],arr[:,1])
-    # plt.show()
 
+    color = "green" 
+    # SCATTER POINTS with old clean_vetices  -----------------------------------------------------------------------
     plt.figure(figsize=(8, 8))
-    # Iterate through the cells and plot points
     for _, cell_points in enumerate(clean_vertices):
         cell_points = np.array(cell_points)  # Ensure it's a NumPy array
         x_coords = cell_points[:, 0]
         y_coords = cell_points[:, 1]
         plt.scatter(x_coords, y_coords, label=False)
+
+    # SCATTER POINTS with new filtered_vertices  -----------------------------------------------------------------------
+    # plt.figure(figsize=(8, 8))
+    # for x, y in filtered_vertices:
+    #     plt.scatter(x, y, label=False, color=color)
     
+    # CELL CONTOURS ------------------------------------------------------------------------
     for i in range(N_Cell):
         _, arr = calculateInnerContour(os.path.join(Base_path, "phasedata", f"phase_p{i}_20.000.vtu"))
         grouped_arr = group_vertices(arr)
-        if len(grouped_arr) == 1:
-            for array in grouped_arr:
-                plt.plot(array[:,0],array[:,1], label=False)
-        else:    
-            for array in grouped_arr:
-                plt.plot(array[:, 0], array[:, 1], label="Polygon Outline", linestyle="-")  # Connect all points
-                plt.plot([array[-1, 0], array[0, 0]], [array[-1, 1], array[0, 1]], linestyle="", marker="")  # Skip connecting last to first
+        for array in grouped_arr:
+            plt.plot(array[:,0],array[:,1], label=False, color=color)
+
 
     plt.xlim(0, 100)  
     plt.ylim(0, 100)  
@@ -107,38 +110,34 @@ def clean_and_collect_my_vertices(base_vertices,N_Cell):
     return clean_vertices
 
 
-def collect_and_filter_to_1array(clean_vertices):
+def collect_to_1array(clean_vertices):
 
     #print(f"np.count_nonzero(clean_vertices) = {np.count_nonzero(clean_vertices)}")
     joinedArr = []
     # for arr in clean_vertices:
-    
-    
-    while(len(clean_vertices) > 0):
-        # TODO: also delete empty arrays in next function 
-        success, popped, clean_vertices = pop_deepest_array(clean_vertices)
-        
-        joinedArr = np.concatenate((joinedArr, popped))
-        
-        
-        
-        if(len(clean_vertices) == 0):
-           print("list is empty! finish.")
-    print(f"joinedArr = {print(joinedArr)}")
+    for arr in clean_vertices: 
+        # print(f"arr = {arr}")
+        for point in arr: 
+            joinedArr.append(point)
+
+    # print(f"joinedArr = \n {joinedArr}")
     return joinedArr
 
 
+def filter_double_points(clean_vertices):
+    res = []
+    for point in clean_vertices:
+        append = True
+        for collected_point in res:
+            # print(f"point = {point}")
+            # print(f"collected_point = {collected_point}")
+            if np.linalg.norm(point-collected_point) < 0.2: 
+                append = False 
+        if append:
+            res.append(point)
 
-a = np.array()
-def pop_deepest_array(clean_vertices):
+    return res 
 
-    assert(len(clean_vertices) > 0)
-    selected_arr = clean_vertices[0]
-
-    if len(selected_arr) == 0:
-        return selected_arr, clean_vertices[1:]
-    elif :
-        # check if leave 
 
 
 ### following functions are just for plotting and i must not touch them  ---------------------------------
@@ -361,21 +360,11 @@ def calculateInnerContour(filename,value=0.2):
 # --------------------------------------------------------------------------------------------------------
 
 @time_it 
-def main1234():
-    #TODO: N_Cell=100
+def startCleaning(dirty_vertices_dir, output_clean_path):
     N_Cell=100
-    eps=0.1
     global tol 
     tol=2*0.1*np.sqrt(2)
-    global base_vertices
-    simulation_name = "vertices_not_cleaned_NEW_2"
-    base_vertices = os.path.join(Base_path, simulation_name)
-    #base_vertices = os.path.join(Base_path, "vertices_not_cleaned_OLD_OUTPUT")
-    # all_my_midpoints(N_Cell)
-    clean_and_collect_my_vertices(base_vertices,N_Cell) 
+    clean_and_collect_my_vertices(dirty_vertices_dir, N_Cell) 
     plt.show()
 
-main1234()
-#plot_m1(Base_path,base_vertices,"/Users/Lea.Happel/Documents/Software_IWR/pAticsProject/team-project-p-atics/Pictures_Data_Harish/m3_p_",N_Cell,[2,3,4,5,6])
-#collect_and_post_process_m1(Base_path,base_vertices,Output_path,N_Cell,[2,3,4,5,6],'darkorange')
 

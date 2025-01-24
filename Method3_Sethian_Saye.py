@@ -33,7 +33,7 @@ Fine_grid_600x600_path = os.path.join(Code_path, "small_fine_grid_template_600x6
 Base_path = os.path.join(Code_path, "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1")
 
 # path to uncleaned vertices directory 
-Vertices_Path = os.path.join(Base_path, "vertices_not_cleaned_NEW_2")
+Vertices_Path = os.path.join(Base_path, "vertices_not_cleaned_NEW_3")
 
 
 import numpy as np
@@ -100,7 +100,8 @@ def all_my_midpoints(N_Cell):
     
     for i in range(N_Cell):
         filename = f"neo_positions_p{i}.csv" 
-        data_file = os.path.join(Base_path, "positions", filename)
+        # data_file = os.path.join(Base_path, "positions", filename)
+        data_file = os.path.join(Midpoints_dir_Path, filename)
         pos_phase = pd.read_csv(data_file)
         frame_time = pos_phase[pos_phase["time"]==20]
         x0 = frame_time["x0"].iloc[0]
@@ -322,7 +323,9 @@ def extract_phi(phi, midpoint, N_small_resolution):
                 raise ValueError("midpoint is not in the given area")
 
     # shift it so that midpoint -> 20,20 
-    extracted_grid = shift_grid_vtk(extracted_grid, dx = shift_index - midpoint[0], dy = shift_index - midpoint[1])
+    
+    
+    extracted_grid = shift_grid_vtk(extracted_grid, dx = shift_index - midpoint[0]+0.1, dy = shift_index - midpoint[1]+0.1)
     
     return extracted_grid
 
@@ -456,7 +459,8 @@ def all_my_distances(N_small_resolution,N_Cell,value=0.2):
         
         print("resample loop ",i)
         small_grid_i = read_vtu(Fine_grid_200x200_path)
-        phasefield_path = os.path.join(Base_path, "phasedata", f"phase_p{i}_20.000.vtu")
+        # TODO: check whether path is right
+        phasefield_path = os.path.join(Phasefield_dir_Path, f"phase_p{i}_20.000.vtu")
         phi_grid = extract_to_smaller_file(phasefield_path, small_grid_i, i, N_small_resolution)
         ud_i = calculate_unsigned_dist(40, phi_grid, value)
         small_grid_i = append_np_array(small_grid_i,ud_i,"ud_"+str(i))
@@ -955,9 +959,19 @@ eps = 0.1
 #     if 30 < midpoint[0] < 70 and 30 < midpoint[1] < 70:
 #         print(f"midpoint {i} = {midpoint}")
 
-# all_my_midpoints(N_Cell)
-# TODO: go on and check how all_my_distances works now 
-# all_my_distances(N_fine_resolution, N_Cell)
+def startRun(midpointsDirectoryPath, phasefieldDirectoryPath, output_path):
+
+    global Midpoints_dir_Path 
+    Midpoints_dir_Path = midpointsDirectoryPath
+
+    global Phasefield_dir_Path 
+    Phasefield_dir_Path = phasefieldDirectoryPath
+
+    global Vertices_Path 
+    Vertices_Path = output_path
+
+    all_my_midpoints(N_Cell)
+    all_my_distances(N_fine_resolution, N_Cell)
 
 
 
