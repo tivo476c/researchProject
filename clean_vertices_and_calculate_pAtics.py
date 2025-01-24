@@ -39,8 +39,8 @@ from Method3_Sethian_Saye import all_my_midpoints, adjust_point, time_it
 
 @time_it
 def clean_and_collect_my_vertices(base_vertices,N_Cell):
-    # tol=2*0.1*np.sqrt(2)
-    tol=0.4
+    tol=2*0.1*np.sqrt(2)
+    # tol=0.4
     clean_vertices=[]
     for i in range(N_Cell):
         #print(f"i in clean and collect my vertices = {i}")
@@ -80,19 +80,18 @@ def clean_and_collect_my_vertices(base_vertices,N_Cell):
     print(f"len filtered_vertices = {len(filtered_vertices)}")
 
 
-    color = "green" 
-    # SCATTER POINTS with old clean_vetices  -----------------------------------------------------------------------
+    color = "orange" 
     plt.figure(figsize=(8, 8))
-    for _, cell_points in enumerate(clean_vertices):
-        cell_points = np.array(cell_points)  # Ensure it's a NumPy array
-        x_coords = cell_points[:, 0]
-        y_coords = cell_points[:, 1]
-        plt.scatter(x_coords, y_coords, label=False)
+    # SCATTER POINTS with old clean_vetices  -----------------------------------------------------------------------
+    # for _, cell_points in enumerate(clean_vertices):
+    #     cell_points = np.array(cell_points)  # Ensure it's a NumPy array
+    #     x_coords = cell_points[:, 0]
+    #     y_coords = cell_points[:, 1]
+    #     plt.scatter(x_coords, y_coords, label=False, color=color)
 
     # SCATTER POINTS with new filtered_vertices  -----------------------------------------------------------------------
-    # plt.figure(figsize=(8, 8))
-    # for x, y in filtered_vertices:
-    #     plt.scatter(x, y, label=False, color=color)
+    for x, y in filtered_vertices:
+        plt.scatter(x, y, label=False, color=color)
     
     # CELL CONTOURS ------------------------------------------------------------------------
     for i in range(N_Cell):
@@ -360,11 +359,12 @@ def calculateInnerContour(filename,value=0.2):
 # --------------------------------------------------------------------------------------------------------
 
 @time_it 
-def startCleaning(dirty_vertices_dir, output_clean_path):
+def startCleaning(dirty_vertices_dir, output_clean_path=""):
     N_Cell=100
     global tol 
     tol=2*0.1*np.sqrt(2)
     clean_and_collect_my_vertices(dirty_vertices_dir, N_Cell) 
     plt.show()
 
+startCleaning(os.path.join(Base_path, "vertices_not_cleaned_NEW_4"))
 
