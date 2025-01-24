@@ -140,6 +140,90 @@ def extract_to_smaller_file(path_phi, fine_grid, i, N_small_resolution):
 
     return VN.vtk_to_numpy(h.GetPointData().GetArray("phi"))
 
+def extract_phi2(phi, midpoint, N_small_resolution):
+     # is the problem, that the section containing the midpoint gets shifted for i=5? 
+
+    shift_index = round(N_small_resolution /20) 
+    x_min = midpoint[0] - shift_index
+    x_max = midpoint[0] + shift_index
+    y_min = midpoint[1] - shift_index
+    y_max = midpoint[1] + shift_index
+        
+    # Apply periodic boundary conditions to the bounds
+    x_min_wrapped = x_min  % 100
+    x_max_wrapped = x_max  % 100
+    y_min_wrapped = y_min  % 100
+    y_max_wrapped = y_max  % 100
+
+    # Control x_interval
+    x_intervals = []
+    if x_min_wrapped < x_max_wrapped and  y_min_wrapped <y_max_wrapped:
+        extracted_grid = extract_region(phi, x_min_wrapped, x_max_wrapped, y_min_wrapped, y_max_wrapped)
+    else: 
+        #Be careful -> I hard coded periodicity from Harish
+        #shift to the left
+        transLeft=vtk.vtkTransform()
+        transLeft.Translate(-100.0,0.0,0.0)
+        transLeftFilter=vtk.vtkTransformFilter()
+        transLeftFilter.SetTransform(transLeft)
+        transLeftFilter.SetInputData(phi)
+        transLeftFilter.Update()
+    
+        #shift to the right
+        transRight=vtk.vtkTransform()
+        transRight.Translate(100.0,0.0,0.0)
+        transRightFilter=vtk.vtkTransformFilter()
+        transRightFilter.SetTransform(transRight)
+        transRightFilter.SetInputData(phi)
+        transRightFilter.Update()
+        #Append Date
+        appFilter=vtk.vtkAppendFilter()
+        appFilter.SetMergePoints(True)
+        appFilter.AddInputData(phi)
+        appFilter.AddInputData(transLeftFilter.GetOutput())
+        appFilter.AddInputData(transRightFilter.GetOutput())
+        appFilter.Update()
+    
+        #store Middle
+        middleData=appFilter.GetOutput()
+    
+        #shift to the top
+        transTop=vtk.vtkTransform()
+        transTop.Translate(0.0,100.0,0.0)
+        transTopFilter=vtk.vtkTransformFilter()
+        transTopFilter.SetTransform(transTop)
+        transTopFilter.SetInputData(middleData)
+        transTopFilter.Update()
+    
+        #shift to the bottom
+        transBottom=vtk.vtkTransform()
+        transBottom.Translate(0.0,-100.0,0.0)
+        transBottomFilter=vtk.vtkTransformFilter()
+        transBottomFilter.SetTransform(transBottom)
+        transBottomFilter.SetInputData(middleData)
+        transBottomFilter.Update()
+    
+        #Append Data oben und unten
+    
+        appFilterAll=vtk.vtkAppendFilter()
+        appFilterAll.SetMergePoints(True)
+        appFilterAll.AddInputData(middleData)
+        appFilterAll.AddInputData(transTopFilter.GetOutput())
+        appFilterAll.AddInputData(transBottomFilter.GetOutput())
+        appFilterAll.Update()
+
+        phi_big=appFilterAll.GetOutput()
+        extracted_grid = extract_region(phi_big, x_min, x_max, y_min, y_max)
+
+
+    
+    # shift it so that midpoint -> 20,20 
+    extracted_grid = shift_grid_vtk(extracted_grid, dx = shift_index - midpoint[0], dy = shift_index - midpoint[1])
+    
+    return extracted_grid
+
+
+
 def extract_phi(phi, midpoint, N_small_resolution):
     """
     Extracts the scalar field `phi` from a given grid, considering periodic boundary conditions.
