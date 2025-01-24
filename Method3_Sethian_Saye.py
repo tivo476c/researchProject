@@ -458,7 +458,7 @@ def all_my_distances(N_small_resolution,N_Cell,value=0.2):
         small_grid_i = read_vtu(Fine_grid_200x200_path)
         phasefield_path = os.path.join(Base_path, "phasedata", f"phase_p{i}_20.000.vtu")
         phi_grid = extract_to_smaller_file(phasefield_path, small_grid_i, i, N_small_resolution)
-        ud_i = calculate_unsigned_dist(40, phi_grid, value)
+        ud_i = calculate_unsigned_dist(200, phi_grid, value)
         small_grid_i = append_np_array(small_grid_i,ud_i,"ud_"+str(i))
         write_path_i = os.path.join(Output_path, f"fine_mesh_{i}_distance.vtu")
         write_vtu(small_grid_i, write_path_i)
@@ -513,7 +513,7 @@ def recalculate_indices(N,coords_grid):
     indices_phi=np.zeros((N+1,N+1),dtype=int)
     ind_phi_x=np.zeros((N+1)*(N+1),dtype=int)
     ind_phi_y=np.zeros((N+1)*(N+1),dtype=int)
-    UpperBound=100.0
+    UpperBound=100.0*(N/1000.0)
     dx=UpperBound/N
     for i in range(coords_grid.shape[0]):
         # i must be in range(( res = N+1 )^2)
