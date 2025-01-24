@@ -56,12 +56,23 @@ def clean_and_collect_my_vertices(base_vertices,N_Cell):
                 if np.linalg.norm(k-dirty_vec_j)<tol:
                     append_j=False
                     break
+
             if (append_j):
                 clean_i.append(dirty_i[j,:])
         clean_vertices.append(np.array(clean_i))
+
+        
         clean_array=np.array(clean_i)
         #print(clean_array.shape)
+    
+    
+    clean_vertices_filtered = collect_and_filter_to_1array(clean_vertices)
 
+    #print(f"clean_vertices = \n {clean_vertices}")
+    #print(f"dims_clean_vertices = {np.ndim(clean_vertices)}")
+    #print(f"shape_clean_vertices = {np.shape(clean_vertices)}")
+    print(f"size clean_vertices_filtered = {np.size(clean_vertices_filtered)}")
+    print(f"len clean_vertices_filtered = {len(clean_vertices_filtered)}")
 
     # plt.scatter(clean_array[:,0],clean_array[:,1])
     # for i in range(N_Cell):
@@ -94,6 +105,41 @@ def clean_and_collect_my_vertices(base_vertices,N_Cell):
     plt.gca().set_aspect('equal', adjustable='box')  # Ensure equal aspect ratio
 
     return clean_vertices
+
+
+def collect_and_filter_to_1array(clean_vertices):
+
+    #print(f"np.count_nonzero(clean_vertices) = {np.count_nonzero(clean_vertices)}")
+    joinedArr = []
+    # for arr in clean_vertices:
+    
+    
+    while(len(clean_vertices) > 0):
+        # TODO: also delete empty arrays in next function 
+        success, popped, clean_vertices = pop_deepest_array(clean_vertices)
+        
+        joinedArr = np.concatenate((joinedArr, popped))
+        
+        
+        
+        if(len(clean_vertices) == 0):
+           print("list is empty! finish.")
+    print(f"joinedArr = {print(joinedArr)}")
+    return joinedArr
+
+
+
+a = np.array()
+def pop_deepest_array(clean_vertices):
+
+    assert(len(clean_vertices) > 0)
+    selected_arr = clean_vertices[0]
+
+    if len(selected_arr) == 0:
+        return selected_arr, clean_vertices[1:]
+    elif :
+        # check if leave 
+
 
 ### following functions are just for plotting and i must not touch them  ---------------------------------
 
@@ -299,7 +345,7 @@ def calculateInnerContour(filename,value=0.2):
     while lines.GetNextCell(idList):
         p=[]
         for i in range(0,idList.GetNumberOfIds()):
-            print(i)
+            #print(i)
             p.append(points.GetPoint(idList.GetId(i)))
             all_indices_p.append(idList.GetId(i))
         p_arr=np.array(p)
@@ -322,7 +368,8 @@ def main1234():
     global tol 
     tol=2*0.1*np.sqrt(2)
     global base_vertices
-    base_vertices = os.path.join(Base_path, "vertices_not_cleaned_NEW")
+    simulation_name = "vertices_not_cleaned_NEW_2"
+    base_vertices = os.path.join(Base_path, simulation_name)
     #base_vertices = os.path.join(Base_path, "vertices_not_cleaned_OLD_OUTPUT")
     # all_my_midpoints(N_Cell)
     clean_and_collect_my_vertices(base_vertices,N_Cell) 
