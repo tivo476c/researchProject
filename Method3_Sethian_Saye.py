@@ -473,7 +473,6 @@ def all_my_distances(N_small_resolution,N_Cell,value=0.2):
 
     # Now all distances are computed and saved to all the small fine meshes. We want to transfer all to one big fine grid 
 
-    # TODO: adapt all_my_vertices so it can deal with 100 small grid files
     all_my_vertices(N_Cell)
     
 def compute_neighbor_indices(i):

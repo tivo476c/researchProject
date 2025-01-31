@@ -7,6 +7,12 @@ PREREQUISITS: the following directories and files must be saved in the executing
 THE FOLLOWING PATHS MUST BE SET MANUALLY IN THE NEXT LINES 
 """
 
+"""
+TODO s:
+* finish setting new linux paths (go on in all_my_vertices)
+* implement leas new code with fixed resolution, look at git, [upperbound in recalculate_indice, calc_unsigned_dist mit 200 aufrufen]
+"""
+
 from pathlib import Path
 import os
 import sys
@@ -33,7 +39,7 @@ Fine_grid_600x600_path = os.path.join(Code_path, "small_fine_grid_template_600x6
 Base_path = os.path.join(Code_path, "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1")
 
 # path to uncleaned vertices directory 
-Vertices_Path = os.path.join(Base_path, "vertices_not_cleaned_NEW_3")
+Dirty_Vertices_Path = os.path.join(Base_path, "vertices_not_cleaned_NEW_3")
 
 
 import numpy as np
@@ -464,11 +470,11 @@ def all_my_distances(N_small_resolution,N_Cell,value=0.2):
         print("resample loop ",i)
         small_grid_i = read_vtu(Fine_grid_200x200_path)
         # TODO: check whether path is right
-        phasefield_path = os.path.join(Phasefield_dir_Path, f"phase_p{i}_20.000.vtu")
+        phasefield_path = os.path.join(Phasefield_dir_Path, f"phase_p{i}_{Active_time_step}00.vtu")
         phi_grid = extract_to_smaller_file(phasefield_path, small_grid_i, i, N_small_resolution)
         ud_i = calculate_unsigned_dist(40, phi_grid, value)
         small_grid_i = append_np_array(small_grid_i,ud_i,"ud_"+str(i))
-        write_path_i = os.path.join(Output_path, f"fine_mesh_{i}_distance.vtu")
+        write_path_i = os.path.join(Dirty_dir_time_path, f"fine_mesh_{i}_distance.vtu")
         write_vtu(small_grid_i, write_path_i)
 
     # Now all distances are computed and saved to all the small fine meshes. We want to transfer all to one big fine grid 
@@ -623,7 +629,7 @@ def all_my_vertices(N_Cells,r=20.0):
                                            dy = all_midpoints[i][1] - 10
                                            )
 
-        small_fine_grid_i_path = os.path.join(Output_path, f"fine_mesh_{i}_distance.vtu")
+        small_fine_grid_i_path = os.path.join(Dirty_dir_time_path, f"fine_mesh_{i}_distance.vtu")
         fine_grid_i = read_vtu(small_fine_grid_i_path).GetOutput()
         # move it such that: midpoint_grid -> midpoint[i]; midpoint_grid = (10, 10)
         fine_grid_i = shift_grid_vtk(
@@ -651,16 +657,16 @@ def all_my_vertices(N_Cells,r=20.0):
             neighborhood_grid = append_small_grid_to_neighborhood_size(fine_grid_j, f"ud_{j}",neighborhood_grid)
             neighborhood_grids_j[j] = fine_grid_j
 
-        write_vtu(neighborhood_grid, os.path.join(Output_path, f"newNeighbors{i}.vtu"))
+        # write_vtu(neighborhood_grid, os.path.join(Output_path, f"newNeighbors{i}.vtu"))
         # REMEMBER TO SEARCH VERTICES ONLY IN GRID_I \CAP GRID_J COORDINATES   
                 
-        print(f"now collecting all cells that are near midpoint[{i}]")
+        # print(f"now collecting all cells that are near midpoint[{i}]")
 
         for j in possible_neighs:
             if (j<i):
                 continue
             # this excludes i
-            print(f"neighbor {j}")
+            # print(f"neighbor {j}")
             
             # operating subdomain = grid_i cap grid_j 
             x_min, x_max, y_min, y_max = cap_grids_bounds(fine_grid_i, neighborhood_grids_j[j])
@@ -675,7 +681,7 @@ def all_my_vertices(N_Cells,r=20.0):
             extractor.Update()
 
             subdomain = extractor.GetOutput()
-            write_vtu(subdomain, os.path.join(Output_path, f"subdomain_i{i}_j{j}.vtu"))
+            # write_vtu(subdomain, os.path.join(Output_path, f"subdomain_i{i}_j{j}.vtu"))
             # TODO: check whether coordinates are correct or need to be shifted to all_midpoints[i] 
             # compute diff between i and j 
             calculator = vtk.vtkArrayCalculator()
@@ -723,7 +729,7 @@ def all_my_vertices(N_Cells,r=20.0):
                 
                 coords_sorted,coords_keys=sort2d_with_key(coords[indices,:],midpoint_i,refvec)
 
-                print(f"coords_sorted = {coords_sorted}, coords_keys = {coords_keys}")
+                # print(f"coords_sorted = {coords_sorted}, coords_keys = {coords_keys}")
                 max_diff=0
                 ind=-100
                 for k in range(len(coords_keys)):
@@ -766,8 +772,8 @@ def all_my_vertices(N_Cells,r=20.0):
                 print("no common boundary")
 
         my_points_i=np.array(all_vertices_collected[i])
-        np.save(f"{Vertices_Path}/phase_{i}",my_points_i)
-        
+
+        np.save(f"{Dirty_dir_time_path}/phase_{i}",my_points_i)
         
 def cap_grids_bounds(grid1, grid2):
     x_min1, x_max1, y_min1, y_max1, _, _ = grid1.GetBounds()
@@ -971,8 +977,8 @@ def startRunMethod3(midpointsDirectoryPath, phasefieldDirectoryPath, output_path
     global Phasefield_dir_Path 
     Phasefield_dir_Path = phasefieldDirectoryPath
 
-    global Vertices_Path 
-    Vertices_Path = output_path
+    global Dirty_Vertices_Path 
+    Dirty_Vertices_Path = output_path
 
     global Active_time_step
     Active_time_step = time

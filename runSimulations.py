@@ -36,9 +36,9 @@ def run_Method3(time):
     for Ca_directory in Ca_directories:
         for simulation in o2024dirs:
             midpoints_path = os.path.join(Core_Path, Ca_directory, simulation, "positions")
-            phasefield_path = os.path.join(Core_Path, Ca_directory, simulation, "phasefield")
+            phasefield_path = os.path.join(Core_Path, Ca_directory, simulation, "data")
             # TODO: this dir must be created on linux pc
-            dirty_vertices_path = os.path.join(Core_Path, Ca_directory, simulation, "data", "dirty_vertices")
+            dirty_vertices_path = os.path.join(Core_Path, Ca_directory, simulation, "dirty_vertices")
             startRunMethod3(midpoints_path, phasefield_path, dirty_vertices_path, time)
 
 def run_Cleaning(i_simulation):
