@@ -33,8 +33,13 @@ Fine_grid_600x600_path = os.path.join(Code_path, "small_fine_grid_template_600x6
 Base_path = os.path.join(Code_path, "o20230614_set3_In3Ca0aa0ar0D0v5Al0Ga3Init1")
 
 # path to uncleaned vertices directory 
-Vertices_Path = os.path.join(Base_path, "vertices_not_cleaned_NEW_3")
+Vertices_Path = os.path.join(Base_path, "vertices_not_cleaned_Final_1_extract_phi2")
 
+# path to directory with input phasefields 
+Phasefield_dir_Path = os.path.join(Base_path, "phasedata")
+
+# path to directory with input midpoints 
+Midpoints_dir_Path = os.path.join(Base_path, "positions")
 
 import numpy as np
 import vtk
@@ -125,7 +130,7 @@ def extract_to_smaller_file(path_phi, fine_grid, i, N_small_resolution):
     midpoint_selected = all_midpoints[i]
     print(f"selected midpoint = {midpoint_selected}")
 
-    extracted_grid = extract_phi(phi, midpoint_selected, N_small_resolution)
+    extracted_grid = extract_phi2(phi, midpoint_selected, N_small_resolution)
     write_path_i = os.path.join(Output_path, f"fine_mesh_{i}_extracted.vtu")
     write_vtu(extracted_grid,write_path_i)
 
@@ -333,6 +338,270 @@ def extract_phi(phi, midpoint, N_small_resolution):
     
     return extracted_grid
 
+def extract_phi2(phi, midpoint, N_small_resolution):
+    """
+    Extracts the scalar field `phi` from a given grid, considering periodic boundary conditions.
+    Other version of extract_phi. It appends the domain by coypying itself to all sides. 
+
+    Args:
+        phi (vtkUnstructuredGrid): The VTK grid containing the scalar field.
+        x_min, x_max (float): Bounds in the x-direction (can be outside the domain [0, Lx]).
+        y_min, y_max (float): Bounds in the y-direction (can be outside the domain [0, Ly]).
+        Lx, Ly (float): Domain size in the x and y directions (default is [0, 100]).
+
+    Returns:
+        np.ndarray: The scalar field values for the extracted subdomain considering periodicity.
+    """
+     # is the problem, that the section containing the midpoint gets shifted for i=5? 
+    shift_index = round(N_small_resolution /20) 
+    x_min = midpoint[0] - shift_index
+    x_max = midpoint[0] + shift_index
+    y_min = midpoint[1] - shift_index
+    y_max = midpoint[1] + shift_index
+        
+    # Apply periodic boundary conditions to the bounds
+    x_min_wrapped = x_min  % 100
+    x_max_wrapped = x_max  % 100
+    y_min_wrapped = y_min  % 100
+    y_max_wrapped = y_max  % 100
+    # Control x_interval
+    x_intervals = []
+    if x_min_wrapped < x_max_wrapped and  y_min_wrapped <y_max_wrapped:
+        extracted_grid = extract_region(phi, x_min_wrapped, x_max_wrapped, y_min_wrapped, y_max_wrapped)
+    else: 
+        #Be careful -> I hard coded periodicity from Harish
+        #shift to the left
+        transLeft=vtk.vtkTransform()
+        transLeft.Translate(-100.0,0.0,0.0)
+        transLeftFilter=vtk.vtkTransformFilter()
+        transLeftFilter.SetTransform(transLeft)
+        transLeftFilter.SetInputData(phi)
+        transLeftFilter.Update()
+    
+        #shift to the right
+        transRight=vtk.vtkTransform()
+        transRight.Translate(100.0,0.0,0.0)
+        transRightFilter=vtk.vtkTransformFilter()
+        transRightFilter.SetTransform(transRight)
+        transRightFilter.SetInputData(phi)
+        transRightFilter.Update()
+        #Append Date
+        appFilter=vtk.vtkAppendFilter()
+        appFilter.SetMergePoints(True)
+        appFilter.AddInputData(phi)
+        appFilter.AddInputData(transLeftFilter.GetOutput())
+        appFilter.AddInputData(transRightFilter.GetOutput())
+        appFilter.Update()
+    
+        #store Middle
+        middleData=appFilter.GetOutput()
+    
+        #shift to the top
+        transTop=vtk.vtkTransform()
+        transTop.Translate(0.0,100.0,0.0)
+        transTopFilter=vtk.vtkTransformFilter()
+        transTopFilter.SetTransform(transTop)
+        transTopFilter.SetInputData(middleData)
+        transTopFilter.Update()
+    
+        #shift to the bottom
+        transBottom=vtk.vtkTransform()
+        transBottom.Translate(0.0,-100.0,0.0)
+        transBottomFilter=vtk.vtkTransformFilter()
+        transBottomFilter.SetTransform(transBottom)
+        transBottomFilter.SetInputData(middleData)
+        transBottomFilter.Update()
+    
+        #Append Data oben und unten
+    
+        appFilterAll=vtk.vtkAppendFilter()
+        appFilterAll.SetMergePoints(True)
+        appFilterAll.AddInputData(middleData)
+        appFilterAll.AddInputData(transTopFilter.GetOutput())
+        appFilterAll.AddInputData(transBottomFilter.GetOutput())
+        appFilterAll.Update()
+        phi_big=appFilterAll.GetOutput()
+        extracted_grid = extract_region(phi_big, x_min, x_max, y_min, y_max)
+    
+    # shift it so that midpoint -> 20,20 
+    extracted_grid = shift_grid_vtk(extracted_grid, dx = shift_index - midpoint[0], dy = shift_index - midpoint[1])
+    
+    return extracted_grid
+
+def extract_phi3(phi, midpoint, N_small_resolution):
+    """
+    Extracts the scalar field `phi` from a given grid, considering periodic boundary conditions.
+    Other version of extract_phi. It appends the domain by coypying itself to all sides. 
+
+    Args:
+        phi (vtkUnstructuredGrid): The VTK grid containing the scalar field.
+        x_min, x_max (float): Bounds in the x-direction (can be outside the domain [0, Lx]).
+        y_min, y_max (float): Bounds in the y-direction (can be outside the domain [0, Ly]).
+        Lx, Ly (float): Domain size in the x and y directions (default is [0, 100]).
+
+    Returns:
+        np.ndarray: The scalar field values for the extracted subdomain considering periodicity.
+    """
+     # is the problem, that the section containing the midpoint gets shifted for i=5? 
+    shift_index = round(N_small_resolution /20) 
+    x_min = midpoint[0] - shift_index
+    x_max = midpoint[0] + shift_index
+    y_min = midpoint[1] - shift_index
+    y_max = midpoint[1] + shift_index
+        
+    # Apply periodic boundary conditions to the bounds
+    #Be careful -> I hard coded periodicity from Harish
+    x_min_wrapped = x_min  % 100
+    x_max_wrapped = x_max  % 100
+    y_min_wrapped = y_min  % 100
+    y_max_wrapped = y_max  % 100
+
+    if x_min_wrapped <= x_max_wrapped and y_min_wrapped <= y_max_wrapped:
+        # whole cell is not located near boundary -> no shifting necessary 
+        extracted_grid = extract_region(phi, x_min_wrapped, x_max_wrapped, y_min_wrapped, y_max_wrapped)
+    elif x_min_wrapped > x_max_wrapped:
+        # cell is located on the vertical domain edge  
+        # also near horizontal edge?? 
+        if y_min_wrapped > y_max_wrapped:
+            # on horizontal edge 
+            # cell is exactly at the corner 
+            # make 3x3 field 
+            
+            transleft=vtk.vtkTransform()
+            # shift to the left
+            transleft.Translate(-100.0,0.0,0.0)
+            transleftFilter=vtk.vtkTransformFilter()
+            transleftFilter.SetTransform(transleft)
+            transleftFilter.SetInputData(phi)
+            transleftFilter.Update()
+
+            #shift to the right
+            transright=vtk.vtkTransform()
+            transright.Translate(100.0,0.0,0.0)
+            transrightFilter=vtk.vtkTransformFilter()
+            transrightFilter.SetTransform(transright)
+            transrightFilter.SetInputData(phi)
+            transrightFilter.Update()
+
+            #shift to the top
+            transTop=vtk.vtkTransform()
+            transTop.Translate(0.0,100.0,0.0)
+            transTopFilter=vtk.vtkTransformFilter()
+            transTopFilter.SetTransform(transTop)
+            transTopFilter.SetInputData(phi)
+            transTopFilter.Update()
+        
+            #shift to the bottom
+            transBottom=vtk.vtkTransform()
+            transBottom.Translate(0.0,-100.0,0.0)
+            transBottomFilter=vtk.vtkTransformFilter()
+            transBottomFilter.SetTransform(transBottom)
+            transBottomFilter.SetInputData(phi)
+            transBottomFilter.Update()
+
+            #shift to the top left
+            transTopLeft=vtk.vtkTransform()
+            transTopLeft.Translate(-100.0,100.0,0.0)
+            transTopLeftFilter=vtk.vtkTransformFilter()
+            transTopLeftFilter.SetTransform(transTopLeft)
+            transTopLeftFilter.SetInputData(phi)
+            transTopLeftFilter.Update()
+        
+            #shift to the bottom left
+            transBottomLeft=vtk.vtkTransform()
+            transBottomLeft.Translate(-100.0,-100.0,0.0)
+            transBottomLeftFilter=vtk.vtkTransformFilter()
+            transBottomLeftFilter.SetTransform(transBottomLeft)
+            transBottomLeftFilter.SetInputData(phi)
+            transBottomLeftFilter.Update()
+
+            #shift to the top right
+            transTopRight=vtk.vtkTransform()
+            transTopRight.Translate(100.0,100.0,0.0)
+            transTopRightFilter=vtk.vtkTransformFilter()
+            transTopRightFilter.SetTransform(transTopRight)
+            transTopRightFilter.SetInputData(phi)
+            transTopRightFilter.Update()
+        
+            #shift to the bottom right
+            transBottomRight=vtk.vtkTransform()
+            transBottomRight.Translate(100.0,-100.0,0.0)
+            transBottomRightFilter=vtk.vtkTransformFilter()
+            transBottomRightFilter.SetTransform(transBottomRight)
+            transBottomRightFilter.SetInputData(phi)
+            transBottomRightFilter.Update()
+
+            # append 
+            appFilter=vtk.vtkAppendFilter()
+            appFilter.SetMergePoints(True)
+            appFilter.AddInputData(phi)
+            # add all transFilters 
+            appFilter.AddInputData(transleftFilter.GetOutput())
+            appFilter.AddInputData(transrightFilter.GetOutput())
+            appFilter.AddInputData(transTopFilter.GetOutput())
+            appFilter.AddInputData(transBottomFilter.GetOutput())
+            appFilter.AddInputData(transTopLeftFilter.GetOutput())
+            appFilter.AddInputData(transBottomLeftFilter.GetOutput())
+            appFilter.AddInputData(transTopRightFilter.GetOutput())
+            appFilter.AddInputData(transBottomRightFilter.GetOutput())
+            appFilter.Update()
+            phi_big=appFilter.GetOutput()
+            extracted_grid = extract_region(phi_big, x_min, x_max, y_min, y_max)
+        else:
+            # only on vertical edge 
+            if(midpoint[1] < 50.0):
+                # shift to the left
+                dx = -100.0
+            else: 
+                #shift to the right
+                dx = 100.0
+
+            trans=vtk.vtkTransform()
+            trans.Translate(dx,0.0,0.0)
+            transFilter=vtk.vtkTransformFilter()
+            transFilter.SetTransform(trans)
+            transFilter.SetInputData(phi)
+            transFilter.Update()
+
+            # append 
+            appFilter=vtk.vtkAppendFilter()
+            appFilter.SetMergePoints(True)
+            appFilter.AddInputData(phi)
+            appFilter.AddInputData(transFilter.GetOutput())
+            appFilter.Update()
+            phi_big = appFilter.GetOutput()
+            extracted_grid = extract_region(phi_big, x_min, x_max, y_min, y_max)
+    else:
+        # cell is located only on horizontal domain edge
+
+        if(midpoint[1] < 50.0):
+            # shift to the bottom
+            dy = -100.0
+        else: 
+            #shift to the top
+            dy = 100.0
+
+        trans=vtk.vtkTransform()
+        trans.Translate(0.0, dy, 0.0)
+        transFilter=vtk.vtkTransformFilter()
+        transFilter.SetTransform(trans)
+        transFilter.SetInputData(phi)
+        transFilter.Update()
+
+        # append 
+        appFilter=vtk.vtkAppendFilter()
+        appFilter.SetMergePoints(True)
+        appFilter.AddInputData(phi)
+        appFilter.AddInputData(transFilter.GetOutput())
+        appFilter.Update()
+        phi_big = appFilter.GetOutput()
+        extracted_grid = extract_region(phi_big, x_min, x_max, y_min, y_max)
+    
+    # shift it so that midpoint -> 20,20 
+    extracted_grid = shift_grid_vtk(extracted_grid, dx = shift_index - midpoint[0], dy = shift_index - midpoint[1])
+    
+    return extracted_grid
+
 def is_midpoint_in_region(midpoint, x_min, x_max, y_min, y_max):
     return x_min <= midpoint[0] <= x_max and y_min <= midpoint[1] <= y_max
 
@@ -431,7 +700,7 @@ def resample_phi_on_fine_grid(filename,filename_grid):
     return h
 
 @time_it
-def all_my_distances(N_small_resolution,N_Cell,value=0.2):
+def all_my_distances(N_small_resolution,N_Cell,sampleTime=20.0,value=0.2):
     """
     Computes and appends the unsigned distance field for multiple phases to a fine grid.
 
@@ -463,17 +732,16 @@ def all_my_distances(N_small_resolution,N_Cell,value=0.2):
         
         print("resample loop ",i)
         small_grid_i = read_vtu(Fine_grid_200x200_path)
-        # TODO: check whether path is right
         phasefield_path = os.path.join(Phasefield_dir_Path, f"phase_p{i}_20.000.vtu")
         phi_grid = extract_to_smaller_file(phasefield_path, small_grid_i, i, N_small_resolution)
-        ud_i = calculate_unsigned_dist(40, phi_grid, value)
+        ud_i = calculate_unsigned_dist(200, phi_grid, value)
         small_grid_i = append_np_array(small_grid_i,ud_i,"ud_"+str(i))
         write_path_i = os.path.join(Output_path, f"fine_mesh_{i}_distance.vtu")
         write_vtu(small_grid_i, write_path_i)
 
     # Now all distances are computed and saved to all the small fine meshes. We want to transfer all to one big fine grid 
 
-    all_my_vertices(N_Cell)
+    all_my_vertices(N_Cell, sampleTime)
     
 def compute_neighbor_indices(i):
     """
@@ -520,7 +788,7 @@ def recalculate_indices(N,coords_grid):
     indices_phi=np.zeros((N+1,N+1),dtype=int)
     ind_phi_x=np.zeros((N+1)*(N+1),dtype=int)
     ind_phi_y=np.zeros((N+1)*(N+1),dtype=int)
-    UpperBound=100.0
+    UpperBound=100.0*(N/1000.0)
     dx=UpperBound/N
     for i in range(coords_grid.shape[0]):
         # i must be in range(( res = N+1 )^2)
@@ -569,7 +837,7 @@ def adjust_point(ref,test_h,grid_length=100):
             test[1] -= grid_length
     return test
 
-def all_my_vertices(N_Cells,r=20.0):
+def all_my_vertices(N_Cells, sampleTime=20.0, r=20.0):
     """
     Collects and saves the vertices of common boundaries between neighboring cells based on midpoints.
 
@@ -675,7 +943,6 @@ def all_my_vertices(N_Cells,r=20.0):
 
             subdomain = extractor.GetOutput()
             write_vtu(subdomain, os.path.join(Output_path, f"subdomain_i{i}_j{j}.vtu"))
-            # TODO: check whether coordinates are correct or need to be shifted to all_midpoints[i] 
             # compute diff between i and j 
             calculator = vtk.vtkArrayCalculator()
             calculator.SetInputData(subdomain)
@@ -704,7 +971,6 @@ def all_my_vertices(N_Cells,r=20.0):
                 try:
                     array_all[k,:]=VN.vtk_to_numpy(contour.GetOutput().GetPointData().GetArray(f"ud_{k}_fixed"))
                 except:
-                    # TODO: check this sus value
                     array_all[k,:] = -2000
             
             array_all=array_all -array_all[i,:][None,:]
@@ -765,7 +1031,9 @@ def all_my_vertices(N_Cells,r=20.0):
                 print("no common boundary")
 
         my_points_i=np.array(all_vertices_collected[i])
-        np.save(f"{Vertices_Path}/phase_{i}",my_points_i)
+        file_name = f"phase_{i}"
+        savePath = os.path.join(Vertices_Path, f"dirty_vertices_time_{sampleTime}", file_name)
+        np.save(savePath, my_points_i)
         
         
 def cap_grids_bounds(grid1, grid2):
@@ -962,8 +1230,13 @@ eps = 0.1
 #     if 30 < midpoint[0] < 70 and 30 < midpoint[1] < 70:
 #         print(f"midpoint {i} = {midpoint}")
 
-def startRunMethod3(midpointsDirectoryPath, phasefieldDirectoryPath, output_path, time):
-
+def startRunMethod3(midpointsDirectoryPath, phasefieldDirectoryPath, output_path, time=20.0):
+    """
+    midpointsDirectoryPath = path to directory with all midpoints
+    phasefieldDirectoryPath = path to directory with input phasefield data 
+    output_path = path to uncleaned vertices files
+    time = sample time 
+    """
     global Midpoints_dir_Path 
     Midpoints_dir_Path = midpointsDirectoryPath
 
@@ -988,22 +1261,10 @@ def startRunMethod3(midpointsDirectoryPath, phasefieldDirectoryPath, output_path
         os.makedirs(Dirty_dir_time_path)
 
     all_my_midpoints(N_Cell)
-    all_my_distances(N_fine_resolution, N_Cell)
+    all_my_distances(N_fine_resolution, N_Cell, time)
+
+# startRunMethod3(Midpoints_dir_Path, Phasefield_dir_Path, Vertices_Path)
 
 
-
-Midpoints_dir_Path = os.path.join(Base_path, "positions")
-all_my_midpoints(N_Cell)
-
-possible_neighs=[]
-my_midpoint_i=all_midpoints[90,:]
-for j in range(100):
-    if (j != 90):
-        other_midpoint = all_midpoints[j,:]
-        other_midpoint = adjust_point(my_midpoint_i,other_midpoint,100.0)
-        if (np.linalg.norm(my_midpoint_i-other_midpoint)<20.0):
-            possible_neighs.append(j)
-
-print(f"possible_neighs = \n {possible_neighs}")
 
 

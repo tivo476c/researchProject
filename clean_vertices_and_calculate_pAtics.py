@@ -38,14 +38,14 @@ from np_sorting_points import sort2d
 from Method3_Sethian_Saye import all_my_midpoints, adjust_point, time_it
 
 @time_it
-def clean_and_collect_my_vertices(base_vertices,N_Cell):
+def clean_and_collect_my_vertices(base_vertices,N_Cell, sampleTime = 20.0):
     tol=2*0.1*np.sqrt(2)
     # tol=0.4
     clean_vertices=[]
     for i in range(N_Cell):
         #print(f"i in clean and collect my vertices = {i}")
         clean_i=[] 
-        dirty_i=np.load(os.path.join(base_vertices, f"phase_{i}.npy"))
+        dirty_i=np.load(os.path.join(base_vertices, f"dirty_vertices_time_{sampleTime}", f"phase_{i}.npy"))
         #print(f"dirty_i = {dirty_i}")
         #print(dirty_i[0,:])
         clean_i.append(dirty_i[0,:])
@@ -366,5 +366,5 @@ def startCleaning(dirty_vertices_dir, output_clean_path=""):
     clean_and_collect_my_vertices(dirty_vertices_dir, N_Cell) 
     plt.show()
 
-startCleaning(os.path.join(Base_path, "vertices_not_cleaned_NEW_4"))
+startCleaning(os.path.join(Base_path, "vertices_not_cleaned_Final_1_extract_phi2"))
 
